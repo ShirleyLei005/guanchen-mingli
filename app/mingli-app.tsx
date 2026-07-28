@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { PlaceMatch, SolarTimeResult } from "../lib/solar-time";
 
@@ -25,6 +26,12 @@ const topics: Record<Product, string[]> = {
 };
 
 const steps = ["选择工具", "出生资料", "本次课题", "基础命盘"];
+const productPaths: Record<Product, string> = {
+  bazi: "/bazi",
+  ziwei: "/ziwei",
+  match: "/match",
+  chat: "/chat",
+};
 
 function mockChart(date: string, gender: string): ChartResult {
   const seed = [...date, ...gender].reduce((sum, char) => sum + char.charCodeAt(0), 0);
@@ -181,15 +188,15 @@ export function MingliApp() {
           <span><strong>观辰</strong><small>东方命理研究所</small></span>
         </a>
         <nav className={mobileNav ? "open" : ""} aria-label="主导航">
-          <a href="#top" onClick={() => setMobileNav(false)}>首页</a>
-          <a href="#calculator" onClick={() => chooseProduct("bazi", true)}>八字命盘</a>
-          <a href="#calculator" onClick={() => chooseProduct("ziwei", true)}>紫微斗数</a>
-          <a href="#calculator" onClick={() => chooseProduct("match", true)}>合盘分析</a>
-          <a className="nav-hot" href="#calculator" onClick={() => chooseProduct("chat", true)}>命盘问答 <i>热门</i></a>
-          <a href="#knowledge" onClick={() => setMobileNav(false)}>命理课堂</a>
+          <Link href="/" onClick={() => setMobileNav(false)}>首页</Link>
+          <a href="/bazi">八字测算</a>
+          <a href="/ziwei">紫微斗数</a>
+          <a href="/match">合盘测算</a>
+          <a className="nav-hot" href="/chat">命盘问答 <i>热门</i></a>
+          <a href="/knowledge">命理课堂</a>
         </nav>
         <div className="account-actions">
-          <a href="#calculator">登录</a>
+          <a href="/login">登录</a>
           <button className="credit-pill" onClick={() => setShowRecharge(true)}><span>余</span>{credits} 体验积分</button>
           <button className="menu-toggle" aria-label="打开菜单" aria-expanded={mobileNav} onClick={() => setMobileNav((value) => !value)}>☰</button>
         </div>
@@ -203,13 +210,13 @@ export function MingliApp() {
           <h1>读懂命盘，<br /><em>不把人生交给命盘。</em></h1>
           <p className="lead">借八字看见时间与天赋，借紫微理解关系与人生领域。命盘呈现的是趋势、惯性和可能遇见的课题，而你如何理解、选择与行动，才真正塑造人生。</p>
           <div className="hero-actions hero-product-actions" aria-label="选择测算类型">
-            <a className="hero-product-btn primary" href="#calculator" onClick={() => chooseProduct("bazi", true)}>
+            <a className="hero-product-btn primary" href="/bazi">
               <small>看整体结构</small><strong>八字测算</strong><span>→</span>
             </a>
-            <a className="hero-product-btn" href="#calculator" onClick={() => chooseProduct("ziwei", true)}>
+            <a className="hero-product-btn" href="/ziwei">
               <small>看具体领域</small><strong>紫微斗数测算</strong><span>→</span>
             </a>
-            <a className="hero-product-btn" href="#calculator" onClick={() => chooseProduct("match", true)}>
+            <a className="hero-product-btn" href="/match">
               <small>看关系互动</small><strong>合盘测算</strong><span>→</span>
             </a>
           </div>
@@ -233,10 +240,10 @@ export function MingliApp() {
         </div>
         <div className="intent-grid">
           {products.map((item, index) => (
-            <button key={item.id} onClick={() => chooseProduct(item.id, true)}>
+            <a key={item.id} href={productPaths[item.id]}>
               <span>0{index + 1}</span><i>{item.stamp}</i>
               <div><small>{item.intent}</small><strong>{item.title}</strong><em>{item.kicker} →</em></div>
-            </button>
+            </a>
           ))}
         </div>
       </section>

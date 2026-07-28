@@ -8,10 +8,10 @@ async function getWorker() {
   return (await import(workerUrl.href)).default;
 }
 
-async function render() {
+async function render(path = "/") {
   const worker = await getWorker();
   return worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html" } }),
+    new Request(`http://localhost${path}`, { headers: { accept: "text/html" } }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
     { waitUntil() {}, passThroughOnException() {} },
   );
@@ -28,6 +28,23 @@ test("server renders the finished Guanchen product", async () => {
   assert.match(html, /命盘问答/);
   assert.match(html, /真太阳时/);
   assert.doesNotMatch(html, /codex-preview|Building your site|react-loading-skeleton/i);
+});
+
+test("each navigation item has its own renderable URL", async () => {
+  const routes = [
+    ["/bazi", /<h1>八字测算<\/h1>/],
+    ["/ziwei", /<h1>紫微斗数测算<\/h1>/],
+    ["/match", /<h1>合盘测算<\/h1>/],
+    ["/chat", /<h1>命盘问答<\/h1>/],
+    ["/knowledge", /命理课堂/],
+    ["/login", /登录观辰/],
+  ];
+
+  for (const [path, expected] of routes) {
+    const response = await render(path);
+    assert.equal(response.status, 200, `${path} should render`);
+    assert.match(await response.text(), expected);
+  }
 });
 
 test("contains commercial data model and safety copy", async () => {
