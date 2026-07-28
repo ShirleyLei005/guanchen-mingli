@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import type { BaziChartResult, ZiweiChartResult } from "../lib/chart-engines";
 import { BirthFields, type ResolvedBirth } from "./birth-fields";
 import { SiteFooter, SiteHeader } from "./site-chrome";
 
@@ -46,6 +47,8 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
   const [consent, setConsent] = useState(true);
   const [notice, setNotice] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [chartResult, setChartResult] = useState<BaziChartResult | ZiweiChartResult | null>(null);
 
   const updatePrimary = useCallback((value: ResolvedBirth | null) => setPrimaryBirth(value), []);
   const updateSecondary = useCallback((value: ResolvedBirth | null) => setSecondaryBirth(value), []);
@@ -62,7 +65,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
     });
   }
 
-  function submit() {
+  async function submit() {
     if (!primaryBirth || (kind === "match" && !secondaryBirth)) {
       setNotice("请先从地点候选列表中确认出生地，并等待真太阳时校正完成。");
       return;
@@ -76,8 +79,31 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
       return;
     }
     setNotice("");
-    setSubmitted(true);
-    window.setTimeout(() => document.querySelector("#measurement-result")?.scrollIntoView({ behavior: "smooth" }), 60);
+    setChartResult(null);
+    setLoading(true);
+    try {
+      if (kind === "bazi" || kind === "ziwei") {
+        const response = await fetch(`/api/charts/${kind}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trueSolarTime: primaryBirth.solarTime.trueSolarTime,
+            gender: primaryBirth.gender,
+            topics: selected,
+            notes,
+          }),
+        });
+        const data = await response.json() as BaziChartResult | ZiweiChartResult | { error?: string };
+        if (!response.ok || "error" in data) throw new Error("排盘服务暂时不可用，请稍后重试。");
+        setChartResult(data);
+      }
+      setSubmitted(true);
+      window.setTimeout(() => document.querySelector("#measurement-result")?.scrollIntoView({ behavior: "smooth" }), 60);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "排盘失败，请稍后重试。");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -124,29 +150,114 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
         </fieldset>
 
         {notice && <p className="measure-notice">{notice}</p>}
-        <button className="measure-submit" onClick={submit}>生成免费基础盘 <span>完整专题 {config.cost} 积分</span> →</button>
-        <p className="measure-submit-help">基础结构永久免费查看；确认报告前不会扣除积分。</p>
+        <button className="measure-submit" disabled={loading} onClick={() => void submit()}>
+          {loading ? "正在排盘…" : "开始测算"} <span>{kind === "bazi" || kind === "ziwei" ? "生成命盘与基础解读" : `完整专题 ${config.cost} 积分`}</span> →
+        </button>
+        <p className="measure-submit-help">点击后将使用已校正的真太阳时生成命盘；基础排盘与本页解读不扣积分。</p>
       </section>
 
       {submitted && primaryBirth && (
         <section className="measure-result" id="measurement-result">
           <div>
-            <p>INPUT VERIFIED</p><h2>出生坐标与排盘时间已确认</h2>
-            <span>正式命盘生成前，先核对以下输入快照。历史记录将保留本次算法与时间校正版本。</span>
+            <p>CHART &amp; REPORT</p><h2>{chartResult ? "排盘与解读报告" : "出生坐标与排盘时间已确认"}</h2>
+            <span>{chartResult ? "以下盘面由固定版本服务端引擎计算；每项解读都标明盘面依据。" : "已完成输入核对，后续产品将继续绑定同一命盘版本。"}</span>
           </div>
           <div className="verified-grid">
             <article><small>出生地点</small><b>{primaryBirth.place.name}</b><span>{primaryBirth.place.latitude.toFixed(4)}°, {primaryBirth.place.longitude.toFixed(4)}°</span></article>
             <article><small>历史时区</small><b>{primaryBirth.place.timezone}</b><span>UTC {primaryBirth.solarTime.timezoneOffsetMinutes / 60 >= 0 ? "+" : ""}{primaryBirth.solarTime.timezoneOffsetMinutes / 60}</span></article>
             <article><small>真太阳时</small><b>{primaryBirth.solarTime.trueSolarTime.replace("T", " ").slice(0, 16)}</b><span>总修正 {primaryBirth.solarTime.totalCorrectionMinutes} 分钟</span></article>
-            <article><small>报告方向</small><b>{selected.join(" · ")}</b><span>完整专题 {config.cost} 积分</span></article>
+            <article><small>报告方向</small><b>{selected.join(" · ")}</b><span>本页基础解读免费</span></article>
           </div>
-          <div className="engine-boundary">
-            <b>下一步：确定性排盘</b>
-            <p>当前已完成出生资料和真太阳时校正。正式干支、星曜、宫位与大运结果必须由固定版本服务端引擎计算并通过黄金样本校验；本页不会用随机数据冒充正式命盘。</p>
-          </div>
+          {chartResult?.kind === "bazi" && <BaziResult result={chartResult} />}
+          {chartResult?.kind === "ziwei" && <ZiweiResult result={chartResult} />}
+          {chartResult && <ReportResult report={chartResult.report} />}
+          {!chartResult && (
+            <div className="engine-boundary">
+              <b>本入口的排盘服务将在下一阶段接入</b>
+              <p>当前已完成出生资料和真太阳时校正；本页不会用随机数据冒充正式命盘。</p>
+            </div>
+          )}
         </section>
       )}
       <SiteFooter />
     </main>
+  );
+}
+
+function BaziResult({ result }: { result: BaziChartResult }) {
+  return (
+    <div className="chart-output">
+      <div className="chart-output-head">
+        <div><small>BAZI MCP</small><h3>{result.chart.bazi}</h3></div>
+        <span>{result.engine.provider} · {result.engine.tool} · v{result.engine.version}</span>
+      </div>
+      <div className="bazi-pillars">
+        {result.chart.pillars.map((pillar) => (
+          <article key={pillar.label}>
+            <small>{pillar.label}</small>
+            <b>{pillar.stem}<em>{pillar.stemElement}</em></b>
+            <b>{pillar.branch}<em>{pillar.branchElement}</em></b>
+            <span>{pillar.tenGod || "日主"} · {pillar.nayin}</span>
+            <i>藏干 {pillar.hiddenStems.join("、") || "—"}</i>
+          </article>
+        ))}
+      </div>
+      <div className="chart-facts">
+        <span><small>日主</small>{result.chart.dayMaster}</span>
+        <span><small>生肖</small>{result.chart.zodiac}</span>
+        <span><small>命宫</small>{result.chart.ownSign}</span>
+        <span><small>身宫</small>{result.chart.bodySign}</span>
+        <span><small>五行表层</small>{Object.entries(result.chart.elements).map(([name, value]) => `${name}${value}`).join(" · ")}</span>
+      </div>
+      <div className="decade-row">
+        {result.chart.decades.slice(0, 6).map((item) => (
+          <span key={`${item.ganzhi}-${item.startYear}`}><b>{item.ganzhi}</b><small>{item.startYear}—{item.endYear}<br />{item.startAge}—{item.endAge} 岁</small></span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ZiweiResult({ result }: { result: ZiweiChartResult }) {
+  return (
+    <div className="chart-output">
+      <div className="chart-output-head">
+        <div><small>ZIWEI MCP CONTRACT</small><h3>命宫在{result.chart.soulPalaceBranch} · {result.chart.fiveElementsClass}</h3></div>
+        <span>{result.engine.provider} 契约 · {result.engine.adapter} v{result.engine.version}</span>
+      </div>
+      <div className="ziwei-grid">
+        {result.chart.palaces.map((palace) => (
+          <article key={`${palace.name}-${palace.earthlyBranch}`} className={palace.earthlyBranch === result.chart.soulPalaceBranch ? "soul-palace" : ""}>
+            <header><b>{palace.name}</b><span>{palace.heavenlyStem}{palace.earthlyBranch}{palace.isBodyPalace ? " · 身宫" : ""}</span></header>
+            <p>{palace.majorStars.map((star) => `${star.name}${star.brightness ? `〔${star.brightness}〕` : ""}${star.mutagen ? `化${star.mutagen}` : ""}`).join("、") || "无十四主星"}</p>
+            <small>{palace.minorStars.slice(0, 5).map((star) => star.name).join(" · ")}</small>
+            <i>{palace.decadal.range[0]}—{palace.decadal.range[1]} 岁</i>
+          </article>
+        ))}
+      </div>
+      <p className="adapter-note">{result.engine.reason}</p>
+    </div>
+  );
+}
+
+function ReportResult({ report }: { report: BaziChartResult["report"] }) {
+  return (
+    <div className="report-output">
+      <div className="report-summary">
+        <small>基础解读</small><h3>{report.summary}</h3>
+        <ul>{report.evidence.map((item) => <li key={item}>{item}</li>)}</ul>
+      </div>
+      <div className="report-topics">
+        {report.topics.map((topic) => (
+          <article key={topic.title}>
+            <small>{topic.title}</small>
+            <h4>盘面依据</h4><p>{topic.evidence}</p>
+            <h4>趋势理解</h4><p>{topic.interpretation}</p>
+            <h4>行动建议</h4><p>{topic.action}</p>
+          </article>
+        ))}
+      </div>
+      <p className="report-disclaimer">{report.disclaimer}</p>
+    </div>
   );
 }

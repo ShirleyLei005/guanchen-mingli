@@ -14,11 +14,13 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "bazi-mcp": "0.1.0",
     "drizzle-orm": "0.45.2",
+    "iztro": "2.5.8",
     "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "iztro": "2.5.8"
+    "tyme4ts": "1.5.2"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",

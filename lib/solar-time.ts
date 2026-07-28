@@ -10,6 +10,9 @@ export type PlaceMatch = {
 };
 
 export type SolarTimeResult = {
+  inputCalendar: "solar" | "lunar";
+  normalizedSolarDateTime: string;
+  isLeapMonth: boolean;
   civilTime: string;
   trueSolarTime: string;
   utcTime: string;
@@ -108,6 +111,9 @@ export function calculateTrueSolarTime(input: {
   localDateTime: string;
   longitude: number;
   timezone: string;
+  inputCalendar?: "solar" | "lunar";
+  normalizedSolarDateTime?: string;
+  isLeapMonth?: boolean;
 }): SolarTimeResult {
   if (!Number.isFinite(input.longitude) || input.longitude < -180 || input.longitude > 180) {
     throw new Error("INVALID_LONGITUDE");
@@ -122,6 +128,9 @@ export function calculateTrueSolarTime(input: {
   const solarWall = new Date(localWallMs + totalCorrectionMinutes * 60000);
 
   return {
+    inputCalendar: input.inputCalendar ?? "solar",
+    normalizedSolarDateTime: input.normalizedSolarDateTime ?? input.localDateTime,
+    isLeapMonth: input.isLeapMonth ?? false,
     civilTime: formatWallTime(new Date(localWallMs)),
     trueSolarTime: formatWallTime(solarWall),
     utcTime: instant.toISOString(),

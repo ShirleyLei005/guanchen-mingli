@@ -47,6 +47,14 @@ test("each navigation item has its own renderable URL", async () => {
   }
 });
 
+test("Bazi and Ziwei forms expose the requested start button", async () => {
+  for (const path of ["/bazi", "/ziwei"]) {
+    const response = await render(path);
+    assert.equal(response.status, 200);
+    assert.match(await response.text(), /<button class="measure-submit">开始测算/);
+  }
+});
+
 test("contains commercial data model and safety copy", async () => {
   const [schema, page] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
@@ -81,4 +89,90 @@ test("true solar time endpoint applies historical timezone, longitude and equati
   assert.equal(result.longitudeCorrectionMinutes, -69.13);
   assert.match(result.trueSolarTime, /^1992-08-18T07:/);
   assert.match(result.method, /IANA历史时区/);
+});
+
+test("lunar input converts leap month before true-solar-time correction", async () => {
+  const worker = await getWorker();
+  const response = await worker.fetch(
+    new Request("http://localhost/api/solar-time", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        localDateTime: "2020-04-01T12:00",
+        longitude: 116.4074,
+        timezone: "Asia/Shanghai",
+        calendar: "lunar",
+        isLeapMonth: true,
+      }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.normalizedSolarDateTime, "2020-05-23T12:00:00");
+  assert.match(result.trueSolarTime, /^2020-05-23T11:/);
+});
+
+test("Cantian Bazi MCP golden sample returns the documented four pillars", async () => {
+  const worker = await getWorker();
+  const response = await worker.fetch(
+    new Request("http://localhost/api/charts/bazi", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        trueSolarTime: "1998-07-31T14:10:00",
+        gender: "male",
+        topics: ["综合看看", "事业方向"],
+      }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.engine.provider, "cantian-ai/bazi-mcp");
+  assert.equal(result.engine.tool, "getBaziDetail");
+  assert.equal(result.chart.bazi, "戊寅 己未 己卯 辛未");
+  assert.deepEqual(result.chart.pillars.map((item) => `${item.stem}${item.branch}`), ["戊寅", "己未", "己卯", "辛未"]);
+  assert.equal(result.report.topics.length, 2);
+});
+
+test("Ziwei MCP contract adapter returns twelve palaces and stable golden fields", async () => {
+  const worker = await getWorker();
+  const response = await worker.fetch(
+    new Request("http://localhost/api/charts/ziwei", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        trueSolarTime: "1990-01-01T08:30:00",
+        gender: "male",
+        topics: ["命盘总览", "事业迁移"],
+      }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.engine.provider, "SiwuXue/ziwei-mcp");
+  assert.equal(result.engine.contract, "generate_chart + interpret_chart");
+  assert.equal(result.engine.adapter, "iztro");
+  assert.equal(result.chart.palaces.length, 12);
+  assert.equal(result.chart.soulPalaceBranch, "酉");
+  assert.equal(result.chart.bodyPalaceBranch, "巳");
+  assert.equal(result.chart.fiveElementsClass, "金四局");
+  assert.equal(result.report.topics.length, 2);
+});
+
+test("chart provider configuration records both requested upstream projects", async () => {
+  const [providers, packageFile] = await Promise.all([
+    readFile(new URL("../config/chart-providers.ts", import.meta.url), "utf8"),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+  ]);
+  assert.match(providers, /cantian-ai\/bazi-mcp/);
+  assert.match(providers, /SiwuXue\/ziwei-mcp/);
+  assert.match(providers, /generate_chart/);
+  assert.match(providers, /interpret_chart/);
+  assert.equal(JSON.parse(packageFile).dependencies["bazi-mcp"], "0.1.0");
 });

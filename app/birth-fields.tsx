@@ -6,6 +6,7 @@ import type { PlaceMatch, SolarTimeResult } from "../lib/solar-time";
 export type ResolvedBirth = {
   gender: "female" | "male";
   calendar: "solar" | "lunar";
+  isLeapMonth: boolean;
   dateTime: string;
   place: PlaceMatch;
   solarTime: SolarTimeResult;
@@ -26,6 +27,7 @@ export function BirthFields({
 }) {
   const [gender, setGender] = useState<"female" | "male">("female");
   const [calendar, setCalendar] = useState<"solar" | "lunar">("solar");
+  const [isLeapMonth, setIsLeapMonth] = useState(false);
   const [dateTime, setDateTime] = useState("1992-08-18T08:30");
   const [query, setQuery] = useState(defaultPlace);
   const [place, setPlace] = useState<PlaceMatch | null>(null);
@@ -63,19 +65,25 @@ export function BirthFields({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
-          body: JSON.stringify({ localDateTime: dateTime, longitude: place!.longitude, timezone: place!.timezone }),
+          body: JSON.stringify({
+            localDateTime: dateTime,
+            longitude: place!.longitude,
+            timezone: place!.timezone,
+            calendar,
+            isLeapMonth,
+          }),
         });
         if (!response.ok) throw new Error("SOLAR_TIME_FAILED");
         const result = await response.json() as SolarTimeResult;
         setSolar(result);
-        onChange({ gender, calendar, dateTime, place: place!, solarTime: result });
+        onChange({ gender, calendar, isLeapMonth, dateTime, place: place!, solarTime: result });
       } catch (error) {
         if ((error as Error).name !== "AbortError") onChange(null);
       }
     }
     void run();
     return () => controller.abort();
-  }, [calendar, dateTime, gender, onChange, place]);
+  }, [calendar, dateTime, gender, isLeapMonth, onChange, place]);
 
   function resetResolved() {
     setSolar(null);
@@ -94,14 +102,22 @@ export function BirthFields({
         </label>
         <label>生日类型
           <span className="measure-segmented">
-            <button type="button" className={calendar === "solar" ? "selected" : ""} onClick={() => setCalendar("solar")}>阳历</button>
-            <button type="button" className={calendar === "lunar" ? "selected" : ""} onClick={() => setCalendar("lunar")}>农历</button>
+            <button type="button" className={calendar === "solar" ? "selected" : ""} onClick={() => { resetResolved(); setCalendar("solar"); setIsLeapMonth(false); }}>阳历</button>
+            <button type="button" className={calendar === "lunar" ? "selected" : ""} onClick={() => { resetResolved(); setCalendar("lunar"); }}>农历</button>
           </span>
         </label>
       </div>
       <label>{calendar === "solar" ? "阳历出生时间" : "农历日期对应的当地钟表时间"}
         <input type="datetime-local" value={dateTime} onChange={(event) => { resetResolved(); setDateTime(event.target.value); }} />
-        {calendar === "lunar" && <small>正式排盘会先校验闰月并换算阳历；当前页面先完成地点和真太阳时校正。</small>}
+        {calendar === "lunar" && (
+          <>
+            <small>系统会先把农历日期换算为阳历，再按出生地经纬度校正真太阳时。</small>
+            <span className="lunar-leap">
+              <input type="checkbox" checked={isLeapMonth} onChange={(event) => { resetResolved(); setIsLeapMonth(event.target.checked); }} />
+              这是闰月
+            </span>
+          </>
+        )}
       </label>
       <label className="measure-place">出生地区
         <input
@@ -133,6 +149,7 @@ export function BirthFields({
           <p>{place.name} · {place.latitude.toFixed(4)}°, {place.longitude.toFixed(4)}° · {place.timezone}</p>
           {solar && (
             <>
+              {calendar === "lunar" && <p>农历已换算为阳历：{displayTime(solar.normalizedSolarDateTime)}</p>}
               <section><span><small>钟表时间</small>{displayTime(solar.civilTime)}</span><i>{solar.totalCorrectionMinutes >= 0 ? "+" : ""}{solar.totalCorrectionMinutes} 分钟</i><span><small>真太阳时</small>{displayTime(solar.trueSolarTime)}</span></section>
               <details><summary>查看计算依据</summary><p>标准经线 {solar.standardMeridian}°；经度修正 {solar.longitudeCorrectionMinutes} 分钟；均时差 {solar.equationOfTimeMinutes} 分钟。</p></details>
             </>
