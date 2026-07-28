@@ -347,7 +347,7 @@ function ZiweiResult({ result }: { result: ZiweiChartResult }) {
         </div>
 
         <section className="ziwei-analysis">
-          <div className="analysis-mode"><button className="active" type="button">命盘分析</button><button type="button">AI 对话</button></div>
+          <div className="analysis-mode"><button className="active" type="button">命盘分析</button><button type="button" onClick={() => { window.location.href = "/chat"; }}>AI 对话</button></div>
           <div className="analysis-tabs" role="tablist" aria-label="紫微命盘分析领域">
             {analysisTabs.map(([label]) => (
               <button type="button" role="tab" aria-selected={analysisTab === label} className={analysisTab === label ? "active" : ""} key={label} onClick={() => setAnalysisTab(label)}>{label}</button>
