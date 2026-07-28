@@ -202,9 +202,16 @@ export function MingliApp() {
           <p className="eyebrow">看见趋势 · 理解课题 · 主动选择</p>
           <h1>读懂命盘，<br /><em>不把人生交给命盘。</em></h1>
           <p className="lead">借八字看见时间与天赋，借紫微理解关系与人生领域。命盘呈现的是趋势、惯性和可能遇见的课题，而你如何理解、选择与行动，才真正塑造人生。</p>
-          <div className="hero-actions">
-            <a className="primary-btn" href="#calculator" onClick={() => setStep(1)}>免费建立我的命盘 <span>→</span></a>
-            <a className="text-btn" href="#compare">八字和紫微怎么选？</a>
+          <div className="hero-actions hero-product-actions" aria-label="选择测算类型">
+            <a className="hero-product-btn primary" href="#calculator" onClick={() => chooseProduct("bazi", true)}>
+              <small>看整体结构</small><strong>八字测算</strong><span>→</span>
+            </a>
+            <a className="hero-product-btn" href="#calculator" onClick={() => chooseProduct("ziwei", true)}>
+              <small>看具体领域</small><strong>紫微斗数测算</strong><span>→</span>
+            </a>
+            <a className="hero-product-btn" href="#calculator" onClick={() => chooseProduct("match", true)}>
+              <small>看关系互动</small><strong>合盘测算</strong><span>→</span>
+            </a>
           </div>
           <div className="trust-row"><span>基础排盘免费</span><span>每项解读有盘面依据</span><span>不作宿命式断言</span></div>
         </div>
