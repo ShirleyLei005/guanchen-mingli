@@ -135,7 +135,8 @@ test("Cantian Bazi MCP golden sample returns the documented four pillars", async
   assert.equal(result.engine.tool, "getBaziDetail");
   assert.equal(result.chart.bazi, "戊寅 己未 己卯 辛未");
   assert.deepEqual(result.chart.pillars.map((item) => `${item.stem}${item.branch}`), ["戊寅", "己未", "己卯", "辛未"]);
-  assert.equal(result.report.topics.length, 2);
+  assert.ok(result.report.topics.length >= 5);
+  assert.ok(result.report.topics.every((topic) => topic.evidence && topic.action));
 });
 
 test("Ziwei MCP contract adapter returns twelve palaces and stable golden fields", async () => {
@@ -162,7 +163,60 @@ test("Ziwei MCP contract adapter returns twelve palaces and stable golden fields
   assert.equal(result.chart.soulPalaceBranch, "酉");
   assert.equal(result.chart.bodyPalaceBranch, "巳");
   assert.equal(result.chart.fiveElementsClass, "金四局");
-  assert.equal(result.report.topics.length, 2);
+  assert.ok(result.report.topics.length >= 5);
+  assert.equal(result.chart.yearlyFlow.length, 10);
+  assert.ok(result.chart.palaces.every((palace) => Array.isArray(palace.adjectiveStars) && Array.isArray(palace.ages)));
+  assert.ok(result.chart.currentFortune.yearly.ganzhi);
+});
+
+test("screenshot-like Ziwei golden sample retains full traditional chart facts", async () => {
+  const worker = await getWorker();
+  const response = await worker.fetch(
+    new Request("http://localhost/api/charts/ziwei", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        trueSolarTime: "1995-01-05T19:50:00",
+        gender: "female",
+        topics: ["命盘总览"],
+      }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.chart.soul, "文曲");
+  assert.equal(result.chart.body, "文昌");
+  assert.equal(result.chart.fiveElementsClass, "火六局");
+  assert.equal(result.chart.palaces.length, 12);
+  assert.ok(result.chart.natalMutagens.length >= 4);
+});
+
+test("compatibility defaults to Bazi and also supports Ziwei without a fake score", async () => {
+  const worker = await getWorker();
+  for (const mode of ["bazi", "ziwei"]) {
+    const response = await worker.fetch(
+      new Request("http://localhost/api/charts/compatibility", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          first: { trueSolarTime: "1990-01-01T08:30:00", gender: "male" },
+          second: { trueSolarTime: "1995-01-05T19:50:00", gender: "female" },
+          topics: ["关系总览"],
+        }),
+      }),
+      { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+      { waitUntil() {}, passThroughOnException() {} },
+    );
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.mode, mode);
+    assert.equal(result.profiles.length, 2);
+    assert.equal("score" in result, false);
+    assert.ok(result.report.topics.length >= 4);
+  }
 });
 
 test("chart provider configuration records both requested upstream projects", async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { BaziChartResult, ZiweiChartResult } from "../lib/chart-engines";
+import type { BaziChartResult, CompatibilityMode, CompatibilityResult, ZiweiChartResult } from "../lib/chart-engines";
 import { BirthFields, type ResolvedBirth } from "./birth-fields";
 import { SiteFooter, SiteHeader } from "./site-chrome";
 
@@ -48,7 +48,8 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
   const [notice, setNotice] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [chartResult, setChartResult] = useState<BaziChartResult | ZiweiChartResult | null>(null);
+  const [matchMode, setMatchMode] = useState<CompatibilityMode>("bazi");
+  const [chartResult, setChartResult] = useState<BaziChartResult | ZiweiChartResult | CompatibilityResult | null>(null);
 
   const updatePrimary = useCallback((value: ResolvedBirth | null) => setPrimaryBirth(value), []);
   const updateSecondary = useCallback((value: ResolvedBirth | null) => setSecondaryBirth(value), []);
@@ -95,7 +96,22 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
         });
         const data = await response.json() as BaziChartResult | ZiweiChartResult | { error?: string };
         if (!response.ok || "error" in data) throw new Error("排盘服务暂时不可用，请稍后重试。");
-        setChartResult(data);
+        setChartResult(data as BaziChartResult | ZiweiChartResult);
+      } else if (kind === "match" && secondaryBirth) {
+        const response = await fetch("/api/charts/compatibility", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode: matchMode,
+            first: { trueSolarTime: primaryBirth.solarTime.trueSolarTime, gender: primaryBirth.gender },
+            second: { trueSolarTime: secondaryBirth.solarTime.trueSolarTime, gender: secondaryBirth.gender },
+            topics: selected,
+            notes,
+          }),
+        });
+        const data = await response.json() as CompatibilityResult | { error?: string };
+        if (!response.ok || "error" in data) throw new Error("合盘服务暂时不可用，请稍后重试。");
+        setChartResult(data as CompatibilityResult);
       }
       setSubmitted(true);
       window.setTimeout(() => document.querySelector("#measurement-result")?.scrollIntoView({ behavior: "smooth" }), 60);
@@ -121,6 +137,21 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
           <h2>开始测算</h2>
           <span>先填基本信息，再选择这次最想看的内容。</span>
         </div>
+
+        {kind === "match" && (
+          <fieldset className="birth-fieldset match-mode-fieldset">
+            <legend>选择合盘体系</legend>
+            <p>默认使用八字合盘；也可以切换为紫微斗数双盘分析。</p>
+            <div className="match-mode-switch">
+              <button type="button" className={matchMode === "bazi" ? "selected" : ""} onClick={() => setMatchMode("bazi")}>
+                <b>八字合盘</b><span>默认 · 日主、日支、十神与五行互动</span>
+              </button>
+              <button type="button" className={matchMode === "ziwei" ? "selected" : ""} onClick={() => setMatchMode("ziwei")}>
+                <b>紫微斗数合盘</b><span>命身、夫妻、福德与三方四正</span>
+              </button>
+            </div>
+          </fieldset>
+        )}
 
         <BirthFields label={kind === "match" ? "第一方资料" : undefined} onChange={updatePrimary} />
         {kind === "match" && <BirthFields label="第二方资料" defaultPlace="成都" onChange={updateSecondary} />}
@@ -170,6 +201,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
           </div>
           {chartResult?.kind === "bazi" && <BaziResult result={chartResult} />}
           {chartResult?.kind === "ziwei" && <ZiweiResult result={chartResult} />}
+          {chartResult?.kind === "compatibility" && <CompatibilityView result={chartResult} />}
           {chartResult && <ReportResult report={chartResult.report} />}
           {!chartResult && (
             <div className="engine-boundary">
@@ -219,23 +251,92 @@ function BaziResult({ result }: { result: BaziChartResult }) {
 }
 
 function ZiweiResult({ result }: { result: ZiweiChartResult }) {
+  const positions: Record<string, string> = {
+    巳: "1 / 1", 午: "1 / 2", 未: "1 / 3", 申: "1 / 4",
+    辰: "2 / 1", 酉: "2 / 4", 卯: "3 / 1", 戌: "3 / 4",
+    寅: "4 / 1", 丑: "4 / 2", 子: "4 / 3", 亥: "4 / 4",
+  };
   return (
     <div className="chart-output">
       <div className="chart-output-head">
         <div><small>ZIWEI MCP CONTRACT</small><h3>命宫在{result.chart.soulPalaceBranch} · {result.chart.fiveElementsClass}</h3></div>
         <span>{result.engine.provider} 契约 · {result.engine.adapter} v{result.engine.version}</span>
       </div>
-      <div className="ziwei-grid">
-        {result.chart.palaces.map((palace) => (
-          <article key={`${palace.name}-${palace.earthlyBranch}`} className={palace.earthlyBranch === result.chart.soulPalaceBranch ? "soul-palace" : ""}>
-            <header><b>{palace.name}</b><span>{palace.heavenlyStem}{palace.earthlyBranch}{palace.isBodyPalace ? " · 身宫" : ""}</span></header>
-            <p>{palace.majorStars.map((star) => `${star.name}${star.brightness ? `〔${star.brightness}〕` : ""}${star.mutagen ? `化${star.mutagen}` : ""}`).join("、") || "无十四主星"}</p>
-            <small>{palace.minorStars.slice(0, 5).map((star) => star.name).join(" · ")}</small>
-            <i>{palace.decadal.range[0]}—{palace.decadal.range[1]} 岁</i>
-          </article>
-        ))}
+      <div className="ziwei-board-wrap">
+        <div className="ziwei-board">
+          {result.chart.palaces.map((palace) => (
+            <article
+              key={`${palace.name}-${palace.earthlyBranch}`}
+              style={{ gridArea: positions[palace.earthlyBranch] }}
+              className={`ziwei-palace ${palace.earthlyBranch === result.chart.soulPalaceBranch ? "soul-palace" : ""}`}
+            >
+              <header><b>{palace.name}</b><span>{palace.heavenlyStem}{palace.earthlyBranch}{palace.isBodyPalace ? " · 身宫" : ""}</span></header>
+              <div className="ziwei-stars major">
+                {palace.majorStars.length ? palace.majorStars.map((star) => (
+                  <span key={star.name} className={star.mutagen ? `mutagen mutagen-${star.mutagen}` : ""}>
+                    {star.name}<small>{star.brightness || ""}</small>{star.mutagen && <em>{star.mutagen}</em>}
+                  </span>
+                )) : <span className="empty-star">无十四主星</span>}
+              </div>
+              <p className="ziwei-stars minor">{palace.minorStars.map((star) => star.name).join(" ")}</p>
+              <p className="ziwei-stars adjective">{palace.adjectiveStars.map((star) => star.name).join(" ")}</p>
+              <div className="palace-ages">{palace.ages.slice(0, 6).join("、")}</div>
+              <footer>
+                <span>{palace.changsheng12} · {palace.boshi12}<br />{palace.jiangqian12} · {palace.suiqian12}</span>
+                <b>{palace.decadal.range[0]}—{palace.decadal.range[1]}</b>
+              </footer>
+            </article>
+          ))}
+          <section className="ziwei-center">
+            <small>本命命盘</small>
+            <h4>{result.chart.yinYangGender} · {result.chart.fiveElementsClass}</h4>
+            <dl>
+              <div><dt>真太阳时</dt><dd>{result.chart.solarDate} {result.chart.time}</dd></div>
+              <div><dt>农历日期</dt><dd>{result.chart.lunarDate}</dd></div>
+              <div><dt>节气四柱</dt><dd>{result.chart.chineseDate}</dd></div>
+              <div><dt>命主 / 身主</dt><dd>{result.chart.soul} / {result.chart.body}</dd></div>
+              <div><dt>命宫 / 身宫</dt><dd>{result.chart.soulPalaceBranch} / {result.chart.bodyPalaceBranch}</dd></div>
+            </dl>
+            <div className="natal-mutagens">
+              <span>生年四化</span>
+              {result.chart.natalMutagens.map((star) => <b key={`${star.name}-${star.mutagen}`} className={`mutagen-${star.mutagen}`}>{star.name}化{star.mutagen}</b>)}
+            </div>
+            <div className="fortune-focus">
+              <span>{result.chart.currentFortune.targetYear} 流年 · 虚岁 {result.chart.currentFortune.nominalAge}</span>
+              <b>{result.chart.currentFortune.yearly.ganzhi} · {result.chart.currentFortune.yearly.palaceName}</b>
+              <small>大限 {result.chart.currentFortune.decadal.range.join("—")} 岁 · {result.chart.currentFortune.decadal.palaceName}</small>
+            </div>
+          </section>
+        </div>
+      </div>
+      <div className="fortune-timeline">
+        <header><b>大限</b><span>十年阶段只表示观察窗口，不等于吉凶定论</span></header>
+        <div>{[...result.chart.palaces].sort((a, b) => a.decadal.range[0] - b.decadal.range[0]).map((palace) => (
+          <span key={`${palace.name}-${palace.decadal.range[0]}`}><b>{palace.decadal.range.join("—")}</b><small>{palace.decadal.heavenlyStem}{palace.decadal.earthlyBranch}<br />{palace.name}</small></span>
+        ))}</div>
+        <header><b>流年</b><span>当前年份前后十年</span></header>
+        <div>{result.chart.yearlyFlow.map((year) => (
+          <span key={year.year} className={year.year === result.chart.currentFortune.targetYear ? "current" : ""}><b>{year.year}</b><small>{year.nominalAge} 岁 · {year.ganzhi}<br />{year.palaceName}</small></span>
+        ))}</div>
       </div>
       <p className="adapter-note">{result.engine.reason}</p>
+    </div>
+  );
+}
+
+function CompatibilityView({ result }: { result: CompatibilityResult }) {
+  return (
+    <div className="chart-output compatibility-output">
+      <div className="chart-output-head">
+        <div><small>{result.mode === "bazi" ? "BAZI SYNASTRY" : "ZIWEI SYNASTRY"}</small><h3>{result.mode === "bazi" ? "八字合盘分析" : "紫微斗数合盘分析"}</h3></div>
+        <span>{result.engine}</span>
+      </div>
+      <div className="compatibility-profiles">
+        {result.profiles.map((profile) => (
+          <article key={profile.label}><small>{profile.label}</small><h4>{profile.headline}</h4>{profile.facts.map((fact) => <span key={fact}>{fact}</span>)}</article>
+        ))}
+      </div>
+      <p className="no-score-note">本报告不设置绝对匹配分数，所有判断都保留双盘依据与现实验证方式。</p>
     </div>
   );
 }
@@ -254,6 +355,7 @@ function ReportResult({ report }: { report: BaziChartResult["report"] }) {
             <h4>盘面依据</h4><p>{topic.evidence}</p>
             <h4>趋势理解</h4><p>{topic.interpretation}</p>
             <h4>行动建议</h4><p>{topic.action}</p>
+            {topic.keyPoints?.length ? <ul className="report-key-points">{topic.keyPoints.map((item) => <li key={item}>{item}</li>)}</ul> : null}
           </article>
         ))}
       </div>
