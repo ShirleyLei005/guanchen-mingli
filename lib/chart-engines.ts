@@ -17,14 +17,33 @@ export type ChartReport = {
 };
 
 export type ZiweiInterpretationModule = {
-  aspect: "general" | "personality" | "career" | "wealth" | "relationships" | "health" | "family";
+  aspect: "general" | "personality" | "career" | "wealth" | "side_income" | "relationships" | "marriage_timing" | "health" | "family";
   title: string;
+  kicker: string;
   headline: string;
+  lead: string;
   summary: string;
   evidence: string[];
   strengths: string[];
   challenges: string[];
   actions: string[];
+  conclusions: string[];
+  analysis: Array<{
+    heading: string;
+    conclusion: string;
+    evidence: string[];
+    explanation: string[];
+  }>;
+  timing: Array<{
+    year: number;
+    label: string;
+    theme: string;
+    opportunity: string;
+    caution: string;
+  }>;
+  risks: Array<{ title: string; detail: string }>;
+  actionPlan: Array<{ horizon: string; title: string; detail: string }>;
+  boundaries: string[];
 };
 
 export type BaziPillar = {
@@ -76,6 +95,8 @@ export type ZiweiStar = {
 export type ZiweiChartResult = {
   kind: "ziwei";
   chartId?: string;
+  reportFocus?: string;
+  selectedTopics?: string[];
   interpretation?: ZiweiInterpretationModule[];
   toolTrace?: Array<{
     tool: "generate_chart" | "interpret_chart";

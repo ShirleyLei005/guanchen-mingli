@@ -149,6 +149,7 @@ test("Ziwei MCP contract adapter returns twelve palaces and stable golden fields
         trueSolarTime: "1990-01-01T08:30:00",
         gender: "male",
         topics: ["命盘总览", "事业迁移"],
+        notes: "未来三年的事业与财富重点是什么？",
       }),
     }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
@@ -163,7 +164,17 @@ test("Ziwei MCP contract adapter returns twelve palaces and stable golden fields
   assert.deepEqual(result.toolTrace.map((item) => item.tool), ["generate_chart", "interpret_chart", "interpret_chart"]);
   assert.deepEqual(result.toolTrace[1].aspects, ["general", "career", "wealth", "relationships"]);
   assert.equal(result.toolTrace[1].detailLevel, "detailed");
-  assert.equal(result.interpretation.length, 7);
+  assert.equal(result.interpretation.length, 9);
+  assert.equal(result.reportFocus, "未来三年的事业与财富重点是什么？");
+  assert.ok(result.interpretation.some((module) => module.aspect === "side_income"));
+  assert.ok(result.interpretation.some((module) => module.aspect === "marriage_timing"));
+  assert.ok(result.interpretation.every((module) => module.conclusions.length >= 2));
+  assert.ok(result.interpretation.every((module) => module.analysis.length >= 3));
+  assert.ok(result.interpretation.every((module) => module.timing.length === 3));
+  assert.ok(result.interpretation.every((module) => module.actionPlan.length >= 2));
+  assert.ok(result.interpretation.every((module) => module.boundaries.length >= 3));
+  const narrative = JSON.stringify(result.interpretation);
+  assert.equal(/一定结婚|准确率|极高概率|保证收益/.test(narrative), false);
   assert.equal(result.chart.palaces.length, 12);
   assert.equal(result.chart.soulPalaceBranch, "酉");
   assert.equal(result.chart.bodyPalaceBranch, "巳");

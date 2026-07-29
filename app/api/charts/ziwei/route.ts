@@ -6,6 +6,7 @@ export async function POST(request: NextRequest) {
     trueSolarTime?: string;
     gender?: "female" | "male";
     topics?: string[];
+    notes?: string;
     calendar?: "solar" | "lunar";
     timezone?: string;
     location?: {
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest) {
       trueSolarTime: body.trueSolarTime,
       gender: body.gender!,
       topics: body.topics.slice(0, 3),
+      question: body.notes?.slice(0, 500),
       calendar: body.calendar ?? "solar",
       timezone: body.timezone ?? "Asia/Shanghai",
       location: body.location ?? {

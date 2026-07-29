@@ -210,7 +210,8 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
           {chartResult?.kind === "bazi" && <BaziResult result={chartResult} />}
           {chartResult?.kind === "ziwei" && <ZiweiResult result={chartResult} />}
           {chartResult?.kind === "compatibility" && <CompatibilityView result={chartResult} />}
-          {chartResult && <ReportResult report={chartResult.report} />}
+          {chartResult?.kind === "ziwei" && <ZiweiNarrativeReport result={chartResult} />}
+          {chartResult && chartResult.kind !== "ziwei" && <ReportResult report={chartResult.report} />}
           {!chartResult && (
             <div className="engine-boundary">
               <b>本入口的排盘服务将在下一阶段接入</b>
@@ -261,6 +262,7 @@ function BaziResult({ result }: { result: BaziChartResult }) {
 function ZiweiResult({ result }: { result: ZiweiChartResult }) {
   const analysisTabs = [
     ["命格总览", "命宫", "general"], ["财运", "财帛", "wealth"], ["事业", "官禄", "career"], ["感情", "夫妻", "relationships"],
+    ["副业", "财帛", "side_income"], ["婚姻时机", "夫妻", "marriage_timing"],
     ["性格", "福德", "personality"], ["健康", "疾厄", "health"], ["兄弟合伙", "兄弟", "family"], ["子女", "子女", "family"],
     ["迁移外出", "迁移", "career"], ["人际贵人", "仆役", "relationships"], ["田宅", "田宅", "wealth"], ["福德", "福德", "personality"], ["父母长辈", "父母", "family"],
   ] as const;
@@ -468,6 +470,119 @@ function CompatibilityView({ result }: { result: CompatibilityResult }) {
       </div>
       <p className="no-score-note">本报告不设置绝对匹配分数，所有判断都保留双盘依据与现实验证方式。</p>
     </div>
+  );
+}
+
+function ZiweiNarrativeReport({ result }: { result: ZiweiChartResult }) {
+  const modules = result.interpretation ?? [];
+  const [activeAspect, setActiveAspect] = useState(modules[0]?.aspect ?? "general");
+  const active = modules.find((module) => module.aspect === activeAspect) ?? modules[0];
+  const general = modules.find((module) => module.aspect === "general") ?? active;
+
+  if (!active || !general) return null;
+
+  return (
+    <section className="ziwei-reading">
+      <header className="reading-cover">
+        <div>
+          <small>PERSONAL CHART READING</small>
+          <p>紫微斗数个人命盘解析</p>
+          <h3>{general.headline}</h3>
+          <span>命盘用于发现人生课题，不替你决定人生。以下内容由 interpret_chart 在固定 chartId 上生成，并保留宫位、星曜、四化与运限依据。</span>
+        </div>
+        <aside>
+          <small>本次优先回应</small>
+          <b>{result.reportFocus || "命格结构与当下课题"}</b>
+          <span>{result.selectedTopics?.join(" · ") || "命盘总览"}</span>
+        </aside>
+      </header>
+
+      <div className="reading-core">
+        <small>核心结论</small>
+        <div>
+          {general.conclusions.map((item, index) => (
+            <p key={item}><b>{String(index + 1).padStart(2, "0")}</b><span>{item}</span></p>
+          ))}
+          <p><b>03</b><span>当前大限落{result.chart.currentFortune.decadal.palaceName}，未来三年的提示会按真实流年落宫逐年展开，不把趋势写成必然事件。</span></p>
+        </div>
+      </div>
+
+      <nav className="reading-tabs" aria-label="详细解读章节">
+        {modules.map((module) => (
+          <button
+            type="button"
+            key={module.aspect}
+            className={module.aspect === active.aspect ? "active" : ""}
+            onClick={() => setActiveAspect(module.aspect)}
+          >
+            {module.title}
+          </button>
+        ))}
+      </nav>
+
+      <article className="reading-chapter">
+        <header>
+          <small>{active.kicker}</small>
+          <h3>{active.title}</h3>
+          <h4>{active.headline}</h4>
+          <p>{active.lead}</p>
+        </header>
+
+        <section className="reading-conclusion">
+          <small>先说结论</small>
+          {active.conclusions.map((item) => <p key={item}>{item}</p>)}
+        </section>
+
+        <section className="reading-analysis">
+          <small>命盘结构与判断依据</small>
+          {active.analysis.map((section) => (
+            <article key={section.heading}>
+              <h4>{section.heading}</h4>
+              <p>{section.conclusion}</p>
+              <div>
+                {section.evidence.map((item) => <span key={item}>{item}</span>)}
+              </div>
+              {section.explanation.map((item) => <p className="reading-explanation" key={item}>{item}</p>)}
+            </article>
+          ))}
+        </section>
+
+        <section className="reading-timing">
+          <header><small>未来三年节奏</small><p>逐年依据来自本命盘的流年落宫；它描述阶段课题，不承诺具体事件。</p></header>
+          <div>
+            {active.timing.map((period) => (
+              <article key={period.year}>
+                <b>{period.year}</b>
+                <small>{period.label}</small>
+                <h4>{period.theme}</h4>
+                <p><em>可把握</em>{period.opportunity}</p>
+                <p><em>需留意</em>{period.caution}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <div className="reading-decisions">
+          <section>
+            <small>风险提醒</small>
+            {active.risks.map((risk) => (
+              <article key={risk.title}><b>{risk.title}</b><p>{risk.detail}</p></article>
+            ))}
+          </section>
+          <section>
+            <small>当前阶段建议</small>
+            {active.actionPlan.map((action) => (
+              <article key={action.horizon}><span>{action.horizon}</span><b>{action.title}</b><p>{action.detail}</p></article>
+            ))}
+          </section>
+        </div>
+
+        <footer className="reading-boundary">
+          <small>判断边界</small>
+          <ul>{active.boundaries.map((item) => <li key={item}>{item}</li>)}</ul>
+        </footer>
+      </article>
+    </section>
   );
 }
 
