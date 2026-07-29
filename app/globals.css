@@ -389,12 +389,12 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .ziwei-palace header b { color: #bd493a; font-size: 12px; }
 .ziwei-palace header span { color: #77756f; font: 8px/1.5 system-ui, sans-serif; }
 .ziwei-board .ziwei-stars { margin: 0; background: transparent !important; border: 0 !important; box-shadow: none !important; }
-.ziwei-board .ziwei-stars.major { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 2px 5px; min-height: 35px; margin-top: 8px; color: #315fb0; font-size: 12px; line-height: 1.2; font-weight: 700; }
-.ziwei-stars.major > span { white-space: nowrap; }
-.ziwei-stars.major small { margin-left: 1px; color: #4a4946; font: 7px/1 system-ui, sans-serif; }
-.ziwei-stars.major em { margin-left: 2px; padding: 2px 3px; color: #fff; background: #b94d3a; border-radius: 3px; box-shadow: 0 2px 4px rgba(130,40,25,.25); font: 8px/1 system-ui, sans-serif; font-style: normal; }
-.ziwei-board .ziwei-stars.minor { min-height: 25px; color: #7748a1; font-size: 9px; line-height: 1.35; }
-.ziwei-board .ziwei-stars.adjective { min-height: 20px; color: #55534f; font: 8px/1.35 system-ui, sans-serif; }
+.ziwei-board .ziwei-major-stars { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 2px 5px; min-height: 35px; margin-top: 8px; color: #315fb0; font-size: 12px; line-height: 1.2; font-weight: 700; }
+.ziwei-major-stars > span { white-space: nowrap; }
+.ziwei-major-stars small { margin-left: 1px; color: #4a4946; font: 7px/1 system-ui, sans-serif; }
+.ziwei-major-stars em { margin-left: 2px; padding: 2px 3px; color: #fff; background: #b94d3a; border-radius: 3px; box-shadow: 0 2px 4px rgba(130,40,25,.25); font: 8px/1 system-ui, sans-serif; font-style: normal; }
+.ziwei-board .ziwei-minor-stars { min-height: 25px; color: #7748a1; font-size: 9px; line-height: 1.35; }
+.ziwei-board .ziwei-adjective-stars { min-height: 20px; color: #55534f; font: 8px/1.35 system-ui, sans-serif; }
 .empty-star { color: #8f887d; font-size: 11px; font-weight: 400; }
 .ziwei-palace footer { position: absolute; left: 13px; right: 13px; bottom: 10px; display: flex; align-items: end; justify-content: space-between; color: #81796e; font: 8px/1.45 system-ui, sans-serif; }
 .ziwei-palace footer b { color: #bd493a; font-size: 11px; }
@@ -451,6 +451,20 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .analysis-evidence small { color: #a17642; font: 700 8px/1 system-ui, sans-serif; }
 .analysis-evidence b { margin-top: 8px; font-size: 11px; }
 .analysis-evidence span { margin-top: 6px; color: #848884; font: 9px/1.6 system-ui, sans-serif; }
+.ziwei-chat-panel { padding-top: 34px; }
+.ziwei-chat-panel > p { margin: 0; color: #5562cf; font: 700 9px/1 system-ui, sans-serif; letter-spacing: .08em; }
+.ziwei-chat-panel h4 { margin: 14px 0 8px; font-size: 30px; }
+.ziwei-chat-panel > span { display: block; max-width: 650px; color: #777c79; font: 11px/1.8 system-ui, sans-serif; }
+.ziwei-chat-panel textarea { min-height: 140px; margin-top: 28px; padding: 18px; color: #252a28; background: #fafafa; border: 1px solid #e3e4e1; border-radius: 10px; font: 12px/1.7 system-ui, sans-serif; }
+.ziwei-chat-panel > button { margin-top: 12px; padding: 12px 24px; color: #fff; background: #273f36; border: 0; border-radius: 8px; cursor: pointer; font-weight: 700; }
+.ziwei-chat-panel > button:disabled { opacity: .6; cursor: wait; }
+.ziwei-chat-error { padding: 12px; color: #9a4036 !important; background: #fff2ef; border-radius: 7px; }
+.ziwei-chat-reply { margin-top: 20px; padding: 22px; background: #f7f5ef; border: 1px solid #e2ded3; border-radius: 10px; }
+.ziwei-chat-reply > small { color: #a17642; font: 700 9px/1 system-ui, sans-serif; letter-spacing: .1em; }
+.ziwei-chat-reply > p { color: #3d4843; font: 12px/1.9 system-ui, sans-serif; }
+.ziwei-chat-reply details { color: #68726d; font: 10px/1.7 system-ui, sans-serif; }
+.ziwei-chat-reply summary { cursor: pointer; color: #405c51; font-weight: 700; }
+.ziwei-chat-reply i { display: block; margin-top: 14px; color: #999d9a; font: 9px/1.6 system-ui, sans-serif; font-style: normal; }
 .fortune-timeline { width: 100%; min-width: 0; overflow-x: auto; color: #34423d; background: #f8f3e9; border: 1px solid rgba(214,184,119,.7); border-top: 0; }
 .fortune-timeline header { display: flex; gap: 14px; align-items: baseline; padding: 12px 16px 6px; }
 .fortune-timeline header b { color: #9f4b39; }

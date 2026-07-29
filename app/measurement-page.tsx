@@ -92,6 +92,14 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
             gender: primaryBirth.gender,
             topics: selected,
             notes,
+            calendar: primaryBirth.calendar,
+            timezone: primaryBirth.place.timezone || "Asia/Shanghai",
+            location: {
+              province: primaryBirth.place.admin1 || primaryBirth.place.name || "北京市",
+              city: primaryBirth.place.name || "北京市",
+              longitude: primaryBirth.place.longitude,
+              latitude: primaryBirth.place.latitude,
+            },
           }),
         });
         const data = await response.json() as BaziChartResult | ZiweiChartResult | { error?: string };
@@ -252,18 +260,25 @@ function BaziResult({ result }: { result: BaziChartResult }) {
 
 function ZiweiResult({ result }: { result: ZiweiChartResult }) {
   const analysisTabs = [
-    ["命格总览", "命宫"], ["财运", "财帛"], ["事业", "官禄"], ["感情", "夫妻"],
-    ["性格", "福德"], ["健康", "疾厄"], ["兄弟合伙", "兄弟"], ["子女", "子女"],
-    ["迁移外出", "迁移"], ["人际贵人", "仆役"], ["田宅", "田宅"], ["福德", "福德"], ["父母长辈", "父母"],
+    ["命格总览", "命宫", "general"], ["财运", "财帛", "wealth"], ["事业", "官禄", "career"], ["感情", "夫妻", "relationships"],
+    ["性格", "福德", "personality"], ["健康", "疾厄", "health"], ["兄弟合伙", "兄弟", "family"], ["子女", "子女", "family"],
+    ["迁移外出", "迁移", "career"], ["人际贵人", "仆役", "relationships"], ["田宅", "田宅", "wealth"], ["福德", "福德", "personality"], ["父母长辈", "父母", "family"],
   ] as const;
   const [analysisTab, setAnalysisTab] = useState<(typeof analysisTabs)[number][0]>("命格总览");
+  const [analysisMode, setAnalysisMode] = useState<"report" | "chat">("report");
+  const [question, setQuestion] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatReply, setChatReply] = useState<{ answer: string; evidence: string[]; tool: string; disclaimer: string } | null>(null);
+  const [chatError, setChatError] = useState("");
   const positions: Record<string, string> = {
     巳: "1 / 1", 午: "1 / 2", 未: "1 / 3", 申: "1 / 4",
     辰: "2 / 1", 酉: "2 / 4", 卯: "3 / 1", 戌: "3 / 4",
     寅: "4 / 1", 丑: "4 / 2", 子: "4 / 3", 亥: "4 / 4",
   };
-  const selectedPalaceName = analysisTabs.find(([label]) => label === analysisTab)?.[1] ?? "命宫";
+  const activeTab = analysisTabs.find(([label]) => label === analysisTab) ?? analysisTabs[0];
+  const selectedPalaceName = activeTab[1];
   const selectedPalace = result.chart.palaces.find((palace) => palace.name.includes(selectedPalaceName)) ?? result.chart.palaces[0];
+  const selectedModule = result.interpretation?.find((module) => module.aspect === activeTab[2]);
   const selectedStars = selectedPalace.majorStars.map((star) => star.name).join("、") || "无十四主星";
   const mainStar = selectedPalace.majorStars[0]?.name || selectedPalace.minorStars[0]?.name || "宫位结构";
   const starHeadlines: Record<string, string> = {
@@ -288,6 +303,28 @@ function ZiweiResult({ result }: { result: ZiweiChartResult }) {
   }).join(", ");
   const palaceMainStar = (name: string) =>
     result.chart.palaces.find((palace) => palace.name.includes(name))?.majorStars[0]?.name || "宫位";
+  async function askChart() {
+    if (!result.chartId || !question.trim()) {
+      setChatError(result.chartId ? "请先输入你想了解的问题。" : "当前命盘缺少 chartId，请重新生成命盘。");
+      return;
+    }
+    setChatLoading(true);
+    setChatError("");
+    try {
+      const response = await fetch("/api/charts/ziwei/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chartId: result.chartId, question: question.trim() }),
+      });
+      const data = await response.json() as { status: string; answer?: string; evidence?: string[]; tool?: string; disclaimer?: string; message?: string };
+      if (!response.ok || data.status !== "success" || !data.answer) throw new Error(data.message || "分析失败");
+      setChatReply({ answer: data.answer, evidence: data.evidence ?? [], tool: data.tool ?? "interpret_chart", disclaimer: data.disclaimer ?? "" });
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "分析失败，请重新生成命盘后再试。");
+    } finally {
+      setChatLoading(false);
+    }
+  }
   return (
     <div className="chart-output">
       <div className="chart-output-head">
@@ -306,15 +343,15 @@ function ZiweiResult({ result }: { result: ZiweiChartResult }) {
                   className={`ziwei-palace ${palace.earthlyBranch === result.chart.soulPalaceBranch ? "soul-palace" : ""}`}
                 >
                   <header><b>{palace.name}</b><span>{palace.decadal.range[0]}—{palace.decadal.range[1]}</span></header>
-                  <div className="ziwei-stars major">
+                  <div className="ziwei-stars ziwei-major-stars">
                     {palace.majorStars.length ? palace.majorStars.map((star) => (
                       <span key={star.name} className={star.mutagen ? `mutagen mutagen-${star.mutagen}` : ""}>
                         {star.name}<small>{star.brightness || ""}</small>{star.mutagen && <em>{star.mutagen}</em>}
                       </span>
                     )) : <span className="empty-star">无十四主星</span>}
                   </div>
-                  <p className="ziwei-stars minor">{palace.minorStars.map((star) => star.name).join(" ")}</p>
-                  <p className="ziwei-stars adjective">{palace.adjectiveStars.map((star) => star.name).join(" ")}</p>
+                  <p className="ziwei-stars ziwei-minor-stars">{palace.minorStars.map((star) => star.name).join(" ")}</p>
+                  <p className="ziwei-stars ziwei-adjective-stars">{palace.adjectiveStars.map((star) => star.name).join(" ")}</p>
                   <footer>
                     <span>{palace.heavenlyStem}{palace.earthlyBranch}</span>
                     <b>{palace.name}{palace.isBodyPalace ? " · 身" : ""}</b>
@@ -347,35 +384,59 @@ function ZiweiResult({ result }: { result: ZiweiChartResult }) {
         </div>
 
         <section className="ziwei-analysis">
-          <div className="analysis-mode"><button className="active" type="button">命盘分析</button><button type="button" onClick={() => { window.location.href = "/chat"; }}>AI 对话</button></div>
-          <div className="analysis-tabs" role="tablist" aria-label="紫微命盘分析领域">
-            {analysisTabs.map(([label]) => (
-              <button type="button" role="tab" aria-selected={analysisTab === label} className={analysisTab === label ? "active" : ""} key={label} onClick={() => setAnalysisTab(label)}>{label}</button>
-            ))}
+          <div className="analysis-mode">
+            <button className={analysisMode === "report" ? "active" : ""} type="button" onClick={() => setAnalysisMode("report")}>命盘分析</button>
+            <button className={analysisMode === "chat" ? "active" : ""} type="button" onClick={() => setAnalysisMode("chat")}>AI 对话</button>
           </div>
-          <div className="analysis-copy">
-            <p>{selectedPalace.name}主星 · {selectedStars}</p>
-            <h4>{starHeadlines[mainStar] || `${mainStar}入宫，从现实选择中理解课题`}</h4>
-            <span>{selectedPalace.name}位于{selectedPalace.heavenlyStem}{selectedPalace.earthlyBranch}，辅曜为{selectedPalace.minorStars.slice(0, 5).map((star) => star.name).join("、") || "—"}。这里呈现的是该领域的关注方式与行动惯性，不是不可改变的结果。</span>
-          </div>
-          <div className="radar-stage" aria-label="六维命盘结构图">
-            <div className="radar-chart">
-              {[92, 72, 52, 32].map((size) => <i key={size} className="radar-ring" style={{ width: `${size}%`, height: `${size}%` }} />)}
-              <i className="radar-axis axis-a" /><i className="radar-axis axis-b" /><i className="radar-axis axis-c" />
-              <div className="radar-data" style={{ clipPath: `polygon(${radarPolygon})` }} />
-              <span className="radar-label radar-l1"><b>综合</b><small>命身结构</small></span>
-              <span className="radar-label radar-l2"><b>事业</b><small>{palaceMainStar("官禄")}</small></span>
-              <span className="radar-label radar-l3"><b>财运</b><small>{palaceMainStar("财帛")}</small></span>
-              <span className="radar-label radar-l4"><b>感情</b><small>{palaceMainStar("夫妻")}</small></span>
-              <span className="radar-label radar-l5"><b>性格</b><small>{palaceMainStar("福德")}</small></span>
-              <span className="radar-label radar-l6"><b>健康</b><small>{palaceMainStar("疾厄")}</small></span>
+          {analysisMode === "report" ? (
+            <>
+              <div className="analysis-tabs" role="tablist" aria-label="紫微命盘分析领域">
+                {analysisTabs.map(([label]) => (
+                  <button type="button" role="tab" aria-selected={analysisTab === label} className={analysisTab === label ? "active" : ""} key={label} onClick={() => setAnalysisTab(label)}>{label}</button>
+                ))}
+              </div>
+              <div className="analysis-copy">
+                <p>{selectedModule?.title || selectedPalace.name} · {selectedStars}</p>
+                <h4>{selectedModule?.headline || starHeadlines[mainStar] || `${mainStar}入宫，从现实选择中理解课题`}</h4>
+                <span>{selectedModule?.summary || `${selectedPalace.name}位于${selectedPalace.heavenlyStem}${selectedPalace.earthlyBranch}。这里呈现的是该领域的关注方式与行动惯性，不是不可改变的结果。`}</span>
+              </div>
+              <div className="radar-stage" aria-label="六维命盘结构图">
+                <div className="radar-chart">
+                  {[92, 72, 52, 32].map((size) => <i key={size} className="radar-ring" style={{ width: `${size}%`, height: `${size}%` }} />)}
+                  <i className="radar-axis axis-a" /><i className="radar-axis axis-b" /><i className="radar-axis axis-c" />
+                  <div className="radar-data" style={{ clipPath: `polygon(${radarPolygon})` }} />
+                  <span className="radar-label radar-l1"><b>综合</b><small>命身结构</small></span>
+                  <span className="radar-label radar-l2"><b>事业</b><small>{palaceMainStar("官禄")}</small></span>
+                  <span className="radar-label radar-l3"><b>财运</b><small>{palaceMainStar("财帛")}</small></span>
+                  <span className="radar-label radar-l4"><b>感情</b><small>{palaceMainStar("夫妻")}</small></span>
+                  <span className="radar-label radar-l5"><b>性格</b><small>{palaceMainStar("福德")}</small></span>
+                  <span className="radar-label radar-l6"><b>健康</b><small>{palaceMainStar("疾厄")}</small></span>
+                </div>
+              </div>
+              <p className="radar-note">六维图仅表示盘面星曜与四化信息密度，不代表能力高低或吉凶评分</p>
+              <div className="analysis-evidence">
+                <article><small>盘面依据</small><b>{selectedModule?.evidence[0] || selectedStars}</b><span>{selectedModule?.evidence.slice(1).join("；") || `${selectedPalace.changsheng12} · ${selectedPalace.boshi12}`}</span></article>
+                <article><small>行动与课题</small><b>{selectedModule?.actions[0] || "这个领域正在要求我学习什么？"}</b><span>{selectedModule?.challenges.join("；") || "结合最近三个月的现实事件核对，不用单一星曜替自己下结论。"}</span></article>
+              </div>
+            </>
+          ) : (
+            <div className="ziwei-chat-panel">
+              <p>BOUND CHART · {result.chartId || "NO CHART ID"}</p>
+              <h4>基于这张命盘继续提问</h4>
+              <span>系统会按问题自动调用 interpret_chart；涉及今年、明年、流年或大限时，改用 analyze_fortune。</span>
+              <textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="例如：未来一年事业上最值得准备的课题是什么？" />
+              <button type="button" disabled={chatLoading} onClick={() => void askChart()}>{chatLoading ? "正在分析…" : "发送问题"}</button>
+              {chatError && <p className="ziwei-chat-error">{chatError}</p>}
+              {chatReply && (
+                <article className="ziwei-chat-reply">
+                  <small>{chatReply.tool}</small>
+                  <p>{chatReply.answer}</p>
+                  <details><summary>查看盘面依据</summary><ul>{chatReply.evidence.map((item) => <li key={item}>{item}</li>)}</ul></details>
+                  <i>{chatReply.disclaimer}</i>
+                </article>
+              )}
             </div>
-          </div>
-          <p className="radar-note">六维图仅表示盘面星曜与四化信息密度，不代表能力高低或吉凶评分</p>
-          <div className="analysis-evidence">
-            <article><small>盘面依据</small><b>{selectedStars}</b><span>{selectedPalace.changsheng12} · {selectedPalace.boshi12} · 大限 {selectedPalace.decadal.range.join("—")} 岁</span></article>
-            <article><small>自我提问</small><b>这个领域正在要求我学习什么？</b><span>结合最近三个月的现实事件核对，不用单一星曜替自己下结论。</span></article>
-          </div>
+          )}
         </section>
       </div>
       <div className="fortune-timeline">

@@ -8,7 +8,7 @@ export const CHART_PROVIDERS = {
   },
   ziwei: {
     source: "https://github.com/SiwuXue/ziwei-mcp",
-    tools: ["generate_chart", "interpret_chart"],
+    tools: ["generate_chart", "interpret_chart", "analyze_fortune"],
     upstreamTransport: "stdio",
     productionAdapter: "iztro@2.5.8",
     compatibilityReason: "Cloudflare Worker cannot spawn stdio/SQLite MCP; upstream core contains explicitly simplified star-placement formulas.",

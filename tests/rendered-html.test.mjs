@@ -159,6 +159,11 @@ test("Ziwei MCP contract adapter returns twelve palaces and stable golden fields
   assert.equal(result.engine.provider, "SiwuXue/ziwei-mcp");
   assert.equal(result.engine.contract, "generate_chart + interpret_chart");
   assert.equal(result.engine.adapter, "iztro");
+  assert.ok(result.chartId);
+  assert.deepEqual(result.toolTrace.map((item) => item.tool), ["generate_chart", "interpret_chart", "interpret_chart"]);
+  assert.deepEqual(result.toolTrace[1].aspects, ["general", "career", "wealth", "relationships"]);
+  assert.equal(result.toolTrace[1].detailLevel, "detailed");
+  assert.equal(result.interpretation.length, 7);
   assert.equal(result.chart.palaces.length, 12);
   assert.equal(result.chart.soulPalaceBranch, "酉");
   assert.equal(result.chart.bodyPalaceBranch, "巳");
@@ -167,6 +172,54 @@ test("Ziwei MCP contract adapter returns twelve palaces and stable golden fields
   assert.equal(result.chart.yearlyFlow.length, 10);
   assert.ok(result.chart.palaces.every((palace) => Array.isArray(palace.adjectiveStars) && Array.isArray(palace.ages)));
   assert.ok(result.chart.currentFortune.yearly.ganzhi);
+});
+
+test("Ziwei chart failure stops with the required structured error", async () => {
+  const worker = await getWorker();
+  const response = await worker.fetch(
+    new Request("http://localhost/api/charts/ziwei", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ gender: "female", topics: [] }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { status: "error", message: "出生时间、性别或分析方向无效" });
+});
+
+test("Ziwei AI dialogue reuses chartId and selects fortune analysis for time questions", async () => {
+  const worker = await getWorker();
+  const chartResponse = await worker.fetch(
+    new Request("http://localhost/api/charts/ziwei", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        trueSolarTime: "1995-01-05T19:50:00",
+        gender: "female",
+        topics: ["命盘总览"],
+      }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  const chart = await chartResponse.json();
+  const chatResponse = await worker.fetch(
+    new Request("http://localhost/api/charts/ziwei/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chartId: chart.chartId, question: "未来一年事业上最值得准备什么？" }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(chatResponse.status, 200);
+  const reply = await chatResponse.json();
+  assert.equal(reply.chartId, chart.chartId);
+  assert.equal(reply.tool, "analyze_fortune");
+  assert.equal(reply.aspect, "career");
+  assert.ok(reply.evidence.length >= 3);
 });
 
 test("screenshot-like Ziwei golden sample retains full traditional chart facts", async () => {
