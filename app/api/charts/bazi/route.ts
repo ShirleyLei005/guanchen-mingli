@@ -6,6 +6,7 @@ export async function POST(request: NextRequest) {
     trueSolarTime?: string;
     gender?: "female" | "male";
     topics?: string[];
+    notes?: string;
   } | null;
   if (!body?.trueSolarTime || !["female", "male"].includes(body.gender ?? "") || !Array.isArray(body.topics)) {
     return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
       trueSolarTime: body.trueSolarTime,
       gender: body.gender!,
       topics: body.topics.slice(0, 3),
+      question: body.notes?.slice(0, 500),
     }));
   } catch (error) {
     return NextResponse.json(

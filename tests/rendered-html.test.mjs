@@ -124,6 +124,7 @@ test("Cantian Bazi MCP golden sample returns the documented four pillars", async
         trueSolarTime: "1998-07-31T14:10:00",
         gender: "male",
         topics: ["综合看看", "事业方向"],
+        notes: "未来三年事业发展最需要准备什么？",
       }),
     }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
@@ -135,6 +136,17 @@ test("Cantian Bazi MCP golden sample returns the documented four pillars", async
   assert.equal(result.engine.tool, "getBaziDetail");
   assert.equal(result.chart.bazi, "戊寅 己未 己卯 辛未");
   assert.deepEqual(result.chart.pillars.map((item) => `${item.stem}${item.branch}`), ["戊寅", "己未", "己卯", "辛未"]);
+  assert.equal(result.analysis.focus, "未来三年事业发展最需要准备什么？");
+  assert.equal(result.analysis.strength.methods.length, 5);
+  assert.match(result.analysis.strength.classification, /定强型|定弱型|动态中和型/);
+  assert.equal(result.analysis.modules.length, 9);
+  assert.equal(result.analysis.decades.length, 10);
+  assert.equal(result.analysis.years.length, 10);
+  assert.equal(Object.values(result.chart.weightedElements).reduce((sum, value) => sum + value, 0) >= 98, true);
+  assert.ok(result.chart.pillars.every((pillar) => Array.isArray(pillar.hiddenTenGods)));
+  const baziNarrative = JSON.stringify(result.analysis);
+  assert.equal(/一定离婚|必然出轨|保证收益|财富等级为/.test(baziNarrative), false);
+  assert.ok(result.analysis.boundaries.some((item) => item.includes("不预测寿命")));
   assert.ok(result.report.topics.length >= 5);
   assert.ok(result.report.topics.every((topic) => topic.evidence && topic.action));
 });

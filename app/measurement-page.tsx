@@ -210,8 +210,9 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
           {chartResult?.kind === "bazi" && <BaziResult result={chartResult} />}
           {chartResult?.kind === "ziwei" && <ZiweiResult result={chartResult} />}
           {chartResult?.kind === "compatibility" && <CompatibilityView result={chartResult} />}
+          {chartResult?.kind === "bazi" && <BaziNarrativeReport result={chartResult} />}
           {chartResult?.kind === "ziwei" && <ZiweiNarrativeReport result={chartResult} />}
-          {chartResult && chartResult.kind !== "ziwei" && <ReportResult report={chartResult.report} />}
+          {chartResult?.kind === "compatibility" && <ReportResult report={chartResult.report} />}
           {!chartResult && (
             <div className="engine-boundary">
               <b>本入口的排盘服务将在下一阶段接入</b>
@@ -248,7 +249,7 @@ function BaziResult({ result }: { result: BaziChartResult }) {
         <span><small>生肖</small>{result.chart.zodiac}</span>
         <span><small>命宫</small>{result.chart.ownSign}</span>
         <span><small>身宫</small>{result.chart.bodySign}</span>
-        <span><small>五行表层</small>{Object.entries(result.chart.elements).map(([name, value]) => `${name}${value}`).join(" · ")}</span>
+        <span><small>五行藏干加权</small>{Object.entries(result.chart.weightedElements).map(([name, value]) => `${name}${value}%`).join(" · ")}</span>
       </div>
       <div className="decade-row">
         {result.chart.decades.slice(0, 6).map((item) => (
@@ -256,6 +257,118 @@ function BaziResult({ result }: { result: BaziChartResult }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function BaziNarrativeReport({ result }: { result: BaziChartResult }) {
+  const analysis = result.analysis;
+  const [activeAspect, setActiveAspect] = useState(analysis.modules[0]?.aspect ?? "overview");
+  const active = analysis.modules.find((module) => module.aspect === activeAspect) ?? analysis.modules[0];
+  if (!active) return null;
+
+  return (
+    <section className="bazi-reading">
+      <header className="bazi-reading-cover">
+        <div>
+          <small>ZI PING STRUCTURAL READING</small>
+          <p>子平八字结构分析</p>
+          <h3>{analysis.strength.classification} · {analysis.structure.patternCandidate}</h3>
+          <span>先复核旺衰与格局，再讨论性格、能力、事业、财富、关系和阶段变量。所有人事结论都保留四柱、藏干、十神与大运依据。</span>
+        </div>
+        <aside><small>本次优先回应</small><b>{analysis.focus}</b><span>真太阳时排盘 · 藏干加权 · 多路径复核</span></aside>
+      </header>
+
+      <section className="bazi-audit">
+        {analysis.inputAudit.map((item) => (
+          <article key={item.item}><small>{item.item}</small><b>{item.value}</b><span>{item.status}</span></article>
+        ))}
+      </section>
+
+      <section className="strength-review">
+        <header>
+          <small>零、身强身弱多路径复核</small>
+          <h3>{analysis.strength.conclusion}</h3>
+          <p>{analysis.strength.contradiction}</p>
+        </header>
+        <div>
+          {analysis.strength.methods.map((method) => (
+            <article key={method.method}>
+              <small>{method.method}</small><b>{method.result}</b><p>{method.reason}</p><span>置信度 {method.confidence}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="bazi-structure">
+        <article>
+          <small>一、格局候选与制化</small>
+          <h3>{analysis.structure.patternCandidate}</h3>
+          <p>{analysis.structure.rationale}</p>
+          <div>{analysis.structure.combinations.map((item) => <span key={item}>{item}</span>)}</div>
+          <ul>{analysis.structure.methodReferences.map((item) => <li key={item}>{item}</li>)}</ul>
+        </article>
+        <article>
+          <small>二、五行能量与流通</small>
+          <h3>{analysis.elementFlow.strongest}较显 · {analysis.elementFlow.weakest}较少</h3>
+          <div className="element-bars">
+            {Object.entries(analysis.elementFlow.percentages).map(([element, value]) => (
+              <span key={element}><b>{element}</b><i><em style={{ width: `${value}%` }} /></i><small>{value}%</small></span>
+            ))}
+          </div>
+          <p>{analysis.elementFlow.metaphor}</p>
+          <dl><div><dt>天干链</dt><dd>{analysis.elementFlow.stemChain}</dd></div><div><dt>地支藏干链</dt><dd>{analysis.elementFlow.branchChain}</dd></div></dl>
+          <div className="useful-levels">
+            {analysis.elementFlow.useful.map((item) => <span key={item.level}><small>{item.level}</small><b>{item.element}</b><em>{item.role}</em></span>)}
+          </div>
+          <p className="bazi-caution">{analysis.elementFlow.caution}</p>
+        </article>
+      </section>
+
+      <nav className="bazi-reading-tabs" aria-label="八字详细分析章节">
+        {analysis.modules.map((module) => (
+          <button type="button" key={module.aspect} className={active.aspect === module.aspect ? "active" : ""} onClick={() => setActiveAspect(module.aspect)}>
+            {module.title}
+          </button>
+        ))}
+      </nav>
+
+      <article className="bazi-module">
+        <header><small>{active.kicker}</small><h3>{active.title}</h3><h4>{active.headline}</h4></header>
+        <section className="bazi-conclusions"><small>结构结论</small>{active.conclusions.map((item) => <p key={item}>{item}</p>)}</section>
+        <div className="bazi-module-grid">
+          <section><small>盘面证据</small>{active.evidence.map((item) => <p key={item}>{item}</p>)}</section>
+          <section><small>现实核验问题</small>{active.questions.map((item) => <p key={item}>{item}</p>)}</section>
+        </div>
+        <section className="bazi-actions"><small>可执行建议</small><div>{active.actions.map((item) => <article key={item.horizon}><span>{item.horizon}</span><b>{item.title}</b><p>{item.detail}</p></article>)}</div></section>
+        <p className="bazi-module-boundary"><b>判断边界</b>{active.boundary}</p>
+      </article>
+
+      <section className="bazi-decades">
+        <header><small>三、大运变量</small><h3>每一步先检查状态，再讨论阶段课题</h3><p>起运日期 {result.chart.fortuneStartDate}，起运年龄 {result.chart.fortuneStartAge} 岁。动态中和型会逐运重新检查强弱，不把大运贴成绝对吉凶。</p></header>
+        <div>
+          {analysis.decades.map((decade) => (
+            <article key={`${decade.ganzhi}-${decade.range}`}><small>{decade.range}</small><b>{decade.ganzhi}</b><h4>{decade.state}</h4><p>{decade.activated}</p><span>{decade.observation}</span></article>
+          ))}
+        </div>
+      </section>
+
+      <section className="bazi-years">
+        <header><small>当前十年观察表</small><h3>流年用于准备与复盘，不用于制造确定性事件</h3></header>
+        <div className="bazi-year-table">
+          <div className="year-row year-head"><span>年份</span><span>干支 / 十神</span><span>原局互动</span><span>年度观察主题</span></div>
+          {analysis.years.map((year) => (
+            <div key={year.year} className={`year-row ${year.current ? "current" : ""}`}>
+              <span><b>{year.year}</b>{year.current && <small>当前</small>}</span>
+              <span><b>{year.ganzhi}</b><small>{year.tenGod}</small></span>
+              <span>{year.interaction}</span>
+              <span>{year.theme}<small>{year.action}</small></span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <footer className="bazi-boundaries"><small>报告方法与边界</small><ul>{analysis.boundaries.map((item) => <li key={item}>{item}</li>)}</ul></footer>
+    </section>
   );
 }
 

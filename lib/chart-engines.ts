@@ -1,5 +1,6 @@
 import { getBaziDetail } from "bazi-mcp";
 import { astro } from "iztro";
+import { buildBaziAnalysis, type BaziAnalysis } from "./bazi-interpretation";
 
 export type ChartTopic = {
   title: string;
@@ -54,7 +55,10 @@ export type BaziPillar = {
   branchElement: string;
   tenGod?: string;
   hiddenStems: string[];
+  hiddenTenGods: string[];
   nayin: string;
+  stage: string;
+  void: string;
 };
 
 export type BaziChartResult = {
@@ -72,18 +76,26 @@ export type BaziChartResult = {
     dayMaster: string;
     pillars: BaziPillar[];
     elements: Record<string, number>;
+    weightedElements: Record<string, number>;
     fetalOrigin: string;
     ownSign: string;
     bodySign: string;
+    fortuneStartDate: string;
+    fortuneStartAge: number;
+    interactions: string[];
+    deities: Array<{ pillar: string; names: string[] }>;
     decades: Array<{
       ganzhi: string;
       startYear: number;
       endYear: number;
       startAge: number;
       endAge: number;
+      stemTenGod: string;
+      branchTenGods: string[];
     }>;
   };
   report: ChartReport;
+  analysis: BaziAnalysis;
 };
 
 export type ZiweiStar = {
@@ -166,6 +178,7 @@ type EngineInput = {
   trueSolarTime: string;
   gender: "female" | "male";
   topics: string[];
+  question?: string;
 };
 
 type CompatibilityInput = {
@@ -209,7 +222,10 @@ function normalizePillar(label: string, value: unknown): BaziPillar {
     branchElement: text(branch["五行"]),
     tenGod: text(stem["十神"]) || undefined,
     hiddenStems: hiddenStems(pillar),
+    hiddenTenGods: ["主气", "中气", "余气"].map((key) => text(record(record(branch["藏干"])[key])["十神"])).filter(Boolean),
     nayin: text(pillar["纳音"]),
+    stage: text(pillar["星运"]),
+    void: text(pillar["空亡"]),
   };
 }
 
@@ -220,6 +236,31 @@ function countElements(pillars: BaziPillar[]) {
     if (pillar.branchElement in result) result[pillar.branchElement] += 1;
   }
   return result;
+}
+
+const STEM_ELEMENT: Record<string, string> = {
+  甲: "木", 乙: "木", 丙: "火", 丁: "火", 戊: "土", 己: "土", 庚: "金", 辛: "金", 壬: "水", 癸: "水",
+};
+
+function weightedElements(pillars: BaziPillar[]) {
+  const result: Record<string, number> = { 木: 0, 火: 0, 土: 0, 金: 0, 水: 0 };
+  const hiddenWeights = [0.6, 0.3, 0.1];
+  pillars.forEach((pillar, pillarIndex) => {
+    result[pillar.stemElement] += 1;
+    pillar.hiddenStems.forEach((stem, index) => {
+      const element = STEM_ELEMENT[stem];
+      if (element) result[element] += hiddenWeights[index] * (pillarIndex === 1 ? 1.5 : 1);
+    });
+  });
+  const total = Object.values(result).reduce((sum, value) => sum + value, 0) || 1;
+  return Object.fromEntries(Object.entries(result).map(([element, value]) => [element, Math.round(value / total * 100)]));
+}
+
+function collectKnowledgePoints(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(collectKnowledgePoints);
+  const item = record(value);
+  const own = text(item["知识点"]);
+  return [...(own ? [own] : []), ...Object.values(item).flatMap(collectKnowledgePoints)];
 }
 
 function strongestElement(elements: Record<string, number>) {
@@ -297,6 +338,8 @@ export async function generateBaziChart(input: EngineInput): Promise<BaziChartRe
         endYear: number(value["结束"]),
         startAge: number(value["开始年龄"]),
         endAge: number(value["结束年龄"]),
+        stemTenGod: text(value["天干十神"]),
+        branchTenGods: Array.isArray(value["地支十神"]) ? value["地支十神"].map(text).filter(Boolean) : [],
       };
     })
     : [];
@@ -308,9 +351,17 @@ export async function generateBaziChart(input: EngineInput): Promise<BaziChartRe
     dayMaster: text(raw["日主"]),
     pillars,
     elements: countElements(pillars),
+    weightedElements: weightedElements(pillars),
     fetalOrigin: text(raw["胎元"]),
     ownSign: text(raw["命宫"]),
     bodySign: text(raw["身宫"]),
+    fortuneStartDate: text(fortune["起运日期"]),
+    fortuneStartAge: number(fortune["起运年龄"]),
+    interactions: [...new Set(collectKnowledgePoints(raw["刑冲合会"]))],
+    deities: Object.entries(record(raw["神煞"])).map(([pillar, names]) => ({
+      pillar,
+      names: Array.isArray(names) ? names.map(text).filter(Boolean) : [],
+    })),
     decades,
   };
   const requested = input.topics.length ? input.topics : ["综合看看"];
@@ -319,6 +370,7 @@ export async function generateBaziChart(input: EngineInput): Promise<BaziChartRe
     kind: "bazi",
     engine: { provider: "cantian-ai/bazi-mcp", version: "0.1.0", tool: "getBaziDetail" },
     chart,
+    analysis: buildBaziAnalysis(chart, input.gender, requested, input.question),
     report: {
       summary: `本盘日主为${chart.dayMaster}，四柱为${chart.bazi}。以下解读只讨论可观察的倾向与人生课题，不作宿命式断言。`,
       evidence: [
