@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { BaziChartResult, CompatibilityMode, CompatibilityResult, ZiweiChartResult } from "../lib/chart-engines";
+import type { AiDeepReport } from "../lib/ai-report";
 import { BirthFields, type ResolvedBirth } from "./birth-fields";
 import { SiteFooter, SiteHeader } from "./site-chrome";
 
@@ -48,8 +49,19 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
   const [notice, setNotice] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState(0);
   const [matchMode, setMatchMode] = useState<CompatibilityMode>("bazi");
   const [chartResult, setChartResult] = useState<BaziChartResult | ZiweiChartResult | CompatibilityResult | null>(null);
+
+  useEffect(() => {
+    if (!loading || (kind !== "bazi" && kind !== "ziwei")) return;
+    const timers = [
+      window.setTimeout(() => setLoadingStage(1), 3500),
+      window.setTimeout(() => setLoadingStage(2), 10000),
+      window.setTimeout(() => setLoadingStage(3), 22000),
+    ];
+    return () => timers.forEach(window.clearTimeout);
+  }, [loading, kind]);
 
   const updatePrimary = useCallback((value: ResolvedBirth | null) => setPrimaryBirth(value), []);
   const updateSecondary = useCallback((value: ResolvedBirth | null) => setSecondaryBirth(value), []);
@@ -81,6 +93,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
     }
     setNotice("");
     setChartResult(null);
+    setLoadingStage(0);
     setLoading(true);
     try {
       if (kind === "bazi" || kind === "ziwei") {
@@ -100,10 +113,11 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
               longitude: primaryBirth.place.longitude,
               latitude: primaryBirth.place.latitude,
             },
+            deepReport: true,
           }),
         });
-        const data = await response.json() as BaziChartResult | ZiweiChartResult | { error?: string };
-        if (!response.ok || "error" in data) throw new Error("排盘服务暂时不可用，请稍后重试。");
+        const data = await response.json() as BaziChartResult | ZiweiChartResult | { error?: string; message?: string };
+        if (!response.ok || "error" in data) throw new Error("message" in data && data.message ? data.message : "排盘服务暂时不可用，请稍后重试。");
         setChartResult(data as BaziChartResult | ZiweiChartResult);
       } else if (kind === "match" && secondaryBirth) {
         const response = await fetch("/api/charts/compatibility", {
@@ -190,7 +204,9 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
 
         {notice && <p className="measure-notice">{notice}</p>}
         <button className="measure-submit" disabled={loading} onClick={() => void submit()}>
-          {loading ? "正在排盘…" : "开始测算"} <span>{kind === "bazi" || kind === "ziwei" ? "生成命盘与基础解读" : `完整专题 ${config.cost} 积分`}</span> →
+          {loading
+            ? ["正在校正并排盘…", "正在识别命盘主轴…", "正在生成深度分析…", "正在核对盘面依据…"][loadingStage]
+            : "开始测算"} <span>{kind === "bazi" || kind === "ziwei" ? "生成命盘与深度解读" : `完整专题 ${config.cost} 积分`}</span> →
         </button>
         <p className="measure-submit-help">点击后将使用已校正的真太阳时生成命盘；基础排盘与本页解读不扣积分。</p>
       </section>
@@ -210,8 +226,8 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
           {chartResult?.kind === "bazi" && <BaziResult result={chartResult} />}
           {chartResult?.kind === "ziwei" && <ZiweiResult result={chartResult} />}
           {chartResult?.kind === "compatibility" && <CompatibilityView result={chartResult} />}
-          {chartResult?.kind === "bazi" && <BaziNarrativeReport result={chartResult} />}
-          {chartResult?.kind === "ziwei" && <ZiweiNarrativeReport result={chartResult} />}
+          {chartResult?.kind === "bazi" && (chartResult.aiReport ? <AiDeepReportView report={chartResult.aiReport} kind="bazi" /> : <BaziNarrativeReport result={chartResult} />)}
+          {chartResult?.kind === "ziwei" && (chartResult.aiReport ? <AiDeepReportView report={chartResult.aiReport} kind="ziwei" /> : <ZiweiNarrativeReport result={chartResult} />)}
           {chartResult?.kind === "compatibility" && <ReportResult report={chartResult.report} />}
           {!chartResult && (
             <div className="engine-boundary">
@@ -697,6 +713,89 @@ function ZiweiNarrativeReport({ result }: { result: ZiweiChartResult }) {
       </article>
     </section>
   );
+}
+
+function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi" | "ziwei" }) {
+  const [activeId, setActiveId] = useState(report.chapters[0]?.id || "overview");
+  const active = report.chapters.find((chapter) => chapter.id === activeId) ?? report.chapters[0];
+  const evidenceMap = new Map(report.evidenceCatalog.map((item) => [item.id, item.text]));
+  if (!active) return null;
+
+  return (
+    <section className="ai-deep-report">
+      <header className="ai-report-cover">
+        <div>
+          <small>{kind === "bazi" ? "AI · ZI PING EVIDENCE READING" : "AI · ZIWEI EVIDENCE READING"}</small>
+          <p>{kind === "bazi" ? "八字深度解析报告" : "紫微斗数深度解析报告"}</p>
+          <h3>{report.title}</h3>
+          <span>先由固定版本引擎排盘，再由 AI 依据带编号的盘面事实组织分析；系统已检查每一条引用，不允许模型自行补算命盘。</span>
+        </div>
+        <aside><small>报告版本</small><b>{report.promptVersion}</b><span>{report.model} · {report.reportId.slice(0, 8)}</span></aside>
+      </header>
+
+      <section className="ai-direct-answer">
+        <small>先回应你最关心的问题</small>
+        <p>{report.directAnswer}</p>
+      </section>
+
+      <section className="ai-core-conclusions">
+        <small>核心判断</small>
+        <div>{report.coreConclusions.map((item, index) => (
+          <article key={`${item.title}-${index}`}>
+            <b>{String(index + 1).padStart(2, "0")}</b>
+            <div><h4>{item.title}</h4><p>{item.conclusion}</p><EvidenceRefs refs={item.evidenceRefs} evidenceMap={evidenceMap} /></div>
+          </article>
+        ))}</div>
+      </section>
+
+      <nav className="ai-report-tabs" aria-label="AI 深度报告章节">
+        {report.chapters.map((chapter) => (
+          <button type="button" key={chapter.id} className={chapter.id === active.id ? "active" : ""} onClick={() => setActiveId(chapter.id)}>{chapter.title}</button>
+        ))}
+      </nav>
+
+      <article className="ai-report-chapter">
+        <header><small>CHAPTER · {active.id.toUpperCase()}</small><h3>{active.title}</h3><h4>{active.headline}</h4></header>
+        <div className="ai-narrative">{active.narrative.map((paragraph, index) => <p key={`${active.id}-n-${index}`}>{paragraph}</p>)}</div>
+
+        <section className="ai-expression-grid">
+          <article><small>建设性表达</small><p>{active.constructiveExpression}</p></article>
+          <article><small>压力下的表达</small><p>{active.pressureExpression}</p></article>
+        </section>
+
+        <section className="ai-evidence-section">
+          <header><small>盘面依据与推导</small><p>点击证据编号可查看排盘引擎返回的原始事实。</p></header>
+          <EvidenceRefs refs={active.evidenceRefs} evidenceMap={evidenceMap} expanded />
+          <div>{active.evidenceExplanation.map((item, index) => <p key={`${active.id}-e-${index}`}>{item}</p>)}</div>
+        </section>
+
+        {active.timing.length > 0 && (
+          <section className="ai-timing-section">
+            <header><small>阶段与时间线</small><p>时间只表示议题与环境的变化窗口，不承诺具体事件。</p></header>
+            <div>{active.timing.map((item, index) => (
+              <article key={`${item.period}-${index}`}><b>{item.period}</b><h4>{item.theme}</h4><p><em>可把握</em>{item.opportunity}</p><p><em>需留意</em>{item.caution}</p><EvidenceRefs refs={item.evidenceRefs} evidenceMap={evidenceMap} /></article>
+            ))}</div>
+          </section>
+        )}
+
+        <div className="ai-reflection-actions">
+          <section><small>现实核验问题</small>{active.reflectionQuestions.map((item, index) => <p key={`${active.id}-q-${index}`}>{item}</p>)}</section>
+          <section><small>行动建议</small>{active.actions.map((item, index) => <article key={`${item.horizon}-${index}`}><span>{item.horizon}</span><b>{item.title}</b><p>{item.detail}</p></article>)}</section>
+        </div>
+      </article>
+
+      <footer className="ai-report-footer">
+        <section><small>综合收束</small>{report.finalSynthesis.map((item, index) => <p key={`s-${index}`}>{item}</p>)}</section>
+        <section><small>分析边界</small><ul>{report.boundaries.map((item, index) => <li key={`b-${index}`}>{item}</li>)}</ul></section>
+      </footer>
+    </section>
+  );
+}
+
+function EvidenceRefs({ refs, evidenceMap, expanded = false }: { refs: string[]; evidenceMap: Map<string, string>; expanded?: boolean }) {
+  return <div className={`ai-evidence-refs ${expanded ? "expanded" : ""}`}>{refs.map((ref) => (
+    <details key={ref} open={expanded}><summary>{ref}</summary><p>{evidenceMap.get(ref) || "证据目录中未找到该编号"}</p></details>
+  ))}</div>;
 }
 
 function ReportResult({ report }: { report: BaziChartResult["report"] }) {

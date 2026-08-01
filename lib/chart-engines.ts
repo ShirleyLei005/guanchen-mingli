@@ -1,6 +1,7 @@
 import { getBaziDetail } from "bazi-mcp";
 import { astro } from "iztro";
 import { buildBaziAnalysis, type BaziAnalysis } from "./bazi-interpretation";
+import type { AiDeepReport } from "./ai-report";
 
 export type ChartTopic = {
   title: string;
@@ -96,6 +97,7 @@ export type BaziChartResult = {
   };
   report: ChartReport;
   analysis: BaziAnalysis;
+  aiReport?: AiDeepReport;
 };
 
 export type ZiweiStar = {
@@ -110,6 +112,7 @@ export type ZiweiChartResult = {
   reportFocus?: string;
   selectedTopics?: string[];
   interpretation?: ZiweiInterpretationModule[];
+  aiReport?: AiDeepReport;
   toolTrace?: Array<{
     tool: "generate_chart" | "interpret_chart";
     status: "success";
