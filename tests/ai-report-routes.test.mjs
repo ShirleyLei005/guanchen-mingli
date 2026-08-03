@@ -33,14 +33,18 @@ function mockReport(kind) {
   };
 }
 
-async function getWorkerWithGroqMock() {
-  process.env.AI_REPORT_PROVIDER = "groq";
-  process.env.GROQ_API_KEY = "mock-key";
+async function getWorkerWithSiliconFlowMock() {
+  process.env.AI_REPORT_PROVIDER = "siliconflow";
+  process.env.SILICONFLOW_API_KEY = "mock-key";
   globalThis.fetch = async (input, init) => {
-    assert.match(String(input), /api\.groq\.com\/openai\/v1\/chat\/completions/);
+    assert.match(String(input), /api\.siliconflow\.cn\/v1\/chat\/completions/);
     const request = JSON.parse(String(init?.body || "{}"));
     const context = JSON.parse(request.messages[1].content);
-    return Response.json({ choices: [{ message: { content: JSON.stringify(mockReport(context.reportKind)) } }] });
+    const report = mockReport(context.reportKind);
+    const output = context.chapterId
+      ? report.chapters.find((chapter) => chapter.id === context.chapterId)
+      : (({ chapters: _chapters, ...summary }) => summary)(report);
+    return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify(output) } }] });
   };
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("ai-routes", `${process.pid}-${Date.now()}-${Math.random()}`);
@@ -55,8 +59,8 @@ async function call(worker, path, body) {
   );
 }
 
-test("Bazi, Ziwei and compatibility routes all generate evidence-grounded Groq reports", async () => {
-  const worker = await getWorkerWithGroqMock();
+test("Bazi, Ziwei and compatibility routes all generate evidence-grounded SiliconFlow reports", async () => {
+  const worker = await getWorkerWithSiliconFlowMock();
   const cases = [
     ["/api/charts/bazi", { trueSolarTime: "2000-01-01T12:00:00", gender: "male", topics: ["综合看看"], notes: "虚构测试样本", deepReport: true }],
     ["/api/charts/ziwei", { trueSolarTime: "2000-01-01T12:00:00", gender: "male", topics: ["命盘总览"], notes: "虚构测试样本", deepReport: true }],
@@ -66,8 +70,8 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded Groq r
     const response = await call(worker, path, body);
     assert.equal(response.status, 200, `${path} should generate a report`);
     const result = await response.json();
-    assert.equal(result.aiReport.provider, "groq");
-    assert.equal(result.aiReport.model, "qwen/qwen3.6-27b");
+    assert.equal(result.aiReport.provider, "siliconflow");
+    assert.equal(result.aiReport.model, path === "/api/charts/compatibility" ? "Qwen/Qwen3-8B" : "THUDM/GLM-4-9B-0414");
     assert.equal(result.aiReport.chapters.length, 6);
     const valid = new Set(result.aiReport.evidenceCatalog.map((item) => item.id));
     const cited = result.aiReport.chapters.flatMap((chapter) => [...chapter.evidenceRefs, ...chapter.timing.flatMap((item) => item.evidenceRefs)]);

@@ -25,7 +25,7 @@ export type AiReportChapter = {
 export type AiDeepReport = {
   status: "generated";
   reportId: string;
-  provider: "groq" | "openai";
+  provider: "siliconflow" | "groq" | "openai";
   model: string;
   promptVersion: string;
   title: string;
@@ -200,8 +200,10 @@ function extractOpenAiOutputText(payload: unknown) {
 }
 
 function extractGroqOutputText(payload: unknown) {
-  const response = payload as { choices?: Array<{ message?: { content?: string } }> };
-  const content = response.choices?.[0]?.message?.content;
+  const response = payload as { choices?: Array<{ finish_reason?: string; message?: { content?: string } }> };
+  const choice = response.choices?.[0];
+  if (choice?.finish_reason === "length") throw new AiReportError("INCOMPLETE", "AI 报告达到输出长度上限，请重新生成");
+  const content = choice?.message?.content;
   if (!content) throw new AiReportError("EMPTY_OUTPUT", "Groq 没有返回可用报告");
   return content;
 }
@@ -240,10 +242,159 @@ async function requestStructuredReport(args: {
   catalog: EvidenceItem[];
   correction?: string;
 }) {
-  const provider = (process.env.AI_REPORT_PROVIDER || "groq").toLowerCase();
+  const provider = (process.env.AI_REPORT_PROVIDER || "siliconflow").toLowerCase();
   if (provider === "openai") return requestOpenAiReport(args);
+  if (provider === "siliconflow") return requestSiliconFlowReport(args);
   if (provider === "groq") return requestGroqReport(args);
   throw new AiReportError("AI_PROVIDER_INVALID", `不支持的 AI 报告服务：${provider}`);
+}
+
+async function requestSiliconFlowReport(args: {
+  kind: ReportKind;
+  question: string;
+  topics: string[];
+  catalog: EvidenceItem[];
+  correction?: string;
+}) {
+  const apiKey = process.env.SILICONFLOW_API_KEY;
+  if (!apiKey) throw new AiReportError("AI_NOT_CONFIGURED", "免费 AI 报告服务尚未配置，请管理员设置 SILICONFLOW_API_KEY");
+  const defaultModel = process.env.SILICONFLOW_REPORT_MODEL || "THUDM/GLM-4-9B-0414";
+  const model = args.kind === "compatibility"
+    ? process.env.SILICONFLOW_COMPATIBILITY_MODEL || "Qwen/Qwen3-8B"
+    : defaultModel;
+  const chapterTitles: Record<string, string> = {
+    overview: "命格总览", personality: "性格特质", career: "事业发展", wealth: "财富与资源",
+    relationships: "感情关系", timing: "阶段节奏", communication: "沟通模式", intimacy: "亲密需求",
+    conflict: "冲突修复", cooperation: "现实协作", growth: "共同成长",
+  };
+  const baseContext = {
+    reportKind: args.kind,
+    question: args.question,
+    selectedTopics: args.topics,
+    evidenceCatalog: args.catalog,
+    correction: args.correction || "",
+  };
+  const jobs: Array<() => Promise<unknown>> = [
+    () => callSiliconFlowJson({
+      apiKey, model, maxTokens: 2200,
+      system: `${systemInstructions(args.kind)}\n本次只生成报告总览。directAnswer 为150至250个汉字；coreConclusions 正好3项；finalSynthesis 正好3项；boundaries 正好3项。每项核心结论引用有效证据编号。只返回合法 JSON。`,
+      user: {
+        ...baseContext,
+        requiredJsonShape: {
+          title: "报告标题",
+          directAnswer: "150至250字直接回应",
+          coreConclusions: [{ title: "结论标题", conclusion: "结论正文", evidenceRefs: ["有效证据编号"] }],
+          finalSynthesis: ["总结1", "总结2", "总结3"],
+          boundaries: ["边界1", "边界2", "边界3"],
+        },
+      },
+    }),
+    ...REQUIRED_CHAPTERS[args.kind].map((id) => () => callSiliconFlowJson({
+      apiKey, model, maxTokens: 3000,
+      system: `${systemInstructions(args.kind)}\n本次只生成“${chapterTitles[id]}”一个章节，id 必须严格为 ${id}。narrative 正好3段，每段100至160个汉字；evidenceRefs 正好2至3项且必须有效；evidenceExplanation 正好2项；timing 最多1项；reflectionQuestions 正好2项；actions 正好2项。正向表达、压力表达和行动建议均须具体。只返回合法 JSON。`,
+      user: {
+        ...baseContext,
+        chapterId: id,
+        chapterTitle: chapterTitles[id],
+        requiredJsonShape: {
+          id,
+          title: chapterTitles[id],
+          headline: "本章核心判断",
+          narrative: ["第一段", "第二段", "第三段"],
+          evidenceRefs: ["有效证据编号1", "有效证据编号2"],
+          evidenceExplanation: ["证据如何支持判断1", "证据如何支持判断2"],
+          constructiveExpression: "建设性表达",
+          pressureExpression: "压力下表达",
+          timing: [{ period: "仅使用证据明确提供的阶段", theme: "主题", evidenceRefs: ["有效证据编号"], opportunity: "机会", caution: "提醒" }],
+          reflectionQuestions: ["问题1", "问题2"],
+          actions: [{ horizon: "时间范围", title: "行动标题", detail: "行动细节" }, { horizon: "时间范围", title: "行动标题", detail: "行动细节" }],
+        },
+      },
+    })),
+  ];
+  const outputs: unknown[] = [];
+  for (let index = 0; index < jobs.length; index += 4) {
+    outputs.push(...await Promise.all(jobs.slice(index, index + 4).map((job) => job())));
+  }
+  const chapters = outputs.slice(1) as AiReportChapter[];
+  const rawSummary = outputs[0] as Partial<Omit<GeneratedReport, "chapters">>;
+  const coreConclusions = Array.isArray(rawSummary.coreConclusions) && rawSummary.coreConclusions.length >= 3
+    ? rawSummary.coreConclusions
+    : chapters.slice(0, 3).map((chapter) => ({
+      title: chapter.title,
+      conclusion: chapter.narrative[0] || chapter.headline,
+      evidenceRefs: chapter.evidenceRefs,
+    }));
+  let directAnswer = typeof rawSummary.directAnswer === "string" ? rawSummary.directAnswer : "";
+  if (directAnswer.trim().length < 100) {
+    directAnswer = [directAnswer, ...coreConclusions.map((item) => item.conclusion)]
+      .filter(Boolean)
+      .join("\n")
+      .slice(0, 600);
+  }
+  const parsed: GeneratedReport = {
+    title: typeof rawSummary.title === "string" && rawSummary.title.trim()
+      ? rawSummary.title
+      : args.kind === "compatibility" ? "看见彼此的互动，也保留共同选择" : "在趋势中辨认课题，在选择中塑造人生",
+    directAnswer,
+    coreConclusions,
+    chapters,
+    finalSynthesis: Array.isArray(rawSummary.finalSynthesis) && rawSummary.finalSynthesis.length >= 3
+      ? rawSummary.finalSynthesis
+      : chapters.slice(0, 3).map((chapter) => chapter.constructiveExpression),
+    boundaries: Array.isArray(rawSummary.boundaries) && rawSummary.boundaries.length >= 3
+      ? rawSummary.boundaries
+      : ["传统文化娱乐与自我反思参考。", "不替代医疗、投资或法律等专业意见。", "命盘揭示趋势与课题，不决定人生或关系。"],
+  };
+  return { parsed, model, provider: "siliconflow" as const };
+}
+
+async function callSiliconFlowJson(args: {
+  apiKey: string;
+  model: string;
+  maxTokens: number;
+  system: string;
+  user: unknown;
+}) {
+  let response: Response;
+  try {
+    response = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${args.apiKey}` },
+      signal: AbortSignal.timeout(120_000),
+      body: JSON.stringify({
+        model: args.model,
+        stream: false,
+        temperature: 0.4,
+        top_p: 0.8,
+        max_tokens: args.maxTokens,
+        enable_thinking: false,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: args.system },
+          { role: "user", content: JSON.stringify(args.user) },
+        ],
+      }),
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      throw new AiReportError("AI_TIMEOUT", "免费模型生成时间较长，本次请求已停止，请稍后重试");
+    }
+    throw new AiReportError("SILICONFLOW_REQUEST_FAILED", "无法连接硅基流动服务，请稍后重试");
+  }
+  const payload = await response.json().catch(() => null) as { error?: { message?: string; code?: string } } | null;
+  if (!response.ok) {
+    const providerMessage = payload?.error?.message || "";
+    if (response.status === 401 || /invalid.*key|unauthorized/i.test(providerMessage)) throw new AiReportError("AI_AUTHENTICATION_FAILED", "硅基流动报告服务认证失败，请检查 SILICONFLOW_API_KEY");
+    if (response.status === 429) {
+      const retryAfter = response.headers.get("retry-after");
+      throw new AiReportError("AI_RATE_LIMITED", retryAfter ? `免费模型触发限流，请在 ${retryAfter} 秒后重试` : "免费模型触发限流，请稍后重试");
+    }
+    if (response.status === 402 || /balance|余额|insufficient/i.test(providerMessage)) throw new AiReportError("AI_QUOTA_EXHAUSTED", "当前模型余额不足，请确认选择的是硅基流动免费模型 THUDM/GLM-4-9B-0414");
+    if (response.status === 413 || /token|context|too large/i.test(providerMessage)) throw new AiReportError("AI_TOKEN_LIMIT", "本次盘面资料超过免费模型限制，请减少分析方向后重试");
+    throw new AiReportError("SILICONFLOW_REQUEST_FAILED", providerMessage || `硅基流动请求失败（${response.status}）`);
+  }
+  return parseJsonObject(extractGroqOutputText(payload));
 }
 
 async function requestOpenAiReport(args: {
@@ -344,12 +495,26 @@ async function requestGroqReport(args: {
   return { parsed, model, provider: "groq" as const };
 }
 
-function parseReportJson(content: string): GeneratedReport {
+function parseJsonObject<T = unknown>(content: string): T {
+  const trimmed = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   try {
-    return JSON.parse(content) as GeneratedReport;
+    return JSON.parse(trimmed) as T;
   } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(trimmed.slice(start, end + 1)) as T;
+      } catch {
+        // Fall through to the user-facing structured error below.
+      }
+    }
     throw new AiReportError("INVALID_JSON", "AI 返回的报告格式无效，请重新生成");
   }
+}
+
+function parseReportJson(content: string): GeneratedReport {
+  return parseJsonObject<GeneratedReport>(content);
 }
 
 export async function generateDeepReport(args: {
