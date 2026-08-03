@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateCompatibility, type CompatibilityMode } from "../../../../lib/chart-engines";
+import { AiReportError, generateDeepReport } from "../../../../lib/ai-report";
 
 type BirthPayload = {
   trueSolarTime?: string;
@@ -13,6 +14,8 @@ export async function POST(request: Request) {
       first?: BirthPayload;
       second?: BirthPayload;
       topics?: string[];
+      notes?: string;
+      deepReport?: boolean;
     };
     if (!body.first?.trueSolarTime || !body.second?.trueSolarTime) {
       return NextResponse.json({ error: "MISSING_BIRTH_DATA" }, { status: 400 });
@@ -32,8 +35,21 @@ export async function POST(request: Request) {
       },
       topics: body.topics ?? [],
     });
+    if (body.deepReport) result.aiReport = await generateDeepReport({
+      kind: "compatibility",
+      chart: result,
+      topics: (body.topics ?? []).slice(0, 3),
+      question: body.notes?.slice(0, 500),
+    });
     return NextResponse.json(result);
-  } catch {
-    return NextResponse.json({ error: "COMPATIBILITY_FAILED" }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        status: "error",
+        error: error instanceof AiReportError ? error.code : "COMPATIBILITY_FAILED",
+        message: error instanceof Error ? error.message : "合盘或报告生成失败",
+      },
+      { status: error instanceof AiReportError ? 502 : 500 },
+    );
   }
 }

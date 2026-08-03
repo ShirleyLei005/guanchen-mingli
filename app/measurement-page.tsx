@@ -54,7 +54,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
   const [chartResult, setChartResult] = useState<BaziChartResult | ZiweiChartResult | CompatibilityResult | null>(null);
 
   useEffect(() => {
-    if (!loading || (kind !== "bazi" && kind !== "ziwei")) return;
+    if (!loading || (kind !== "bazi" && kind !== "ziwei" && kind !== "match")) return;
     const timers = [
       window.setTimeout(() => setLoadingStage(1), 3500),
       window.setTimeout(() => setLoadingStage(2), 10000),
@@ -129,10 +129,11 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
             second: { trueSolarTime: secondaryBirth.solarTime.trueSolarTime, gender: secondaryBirth.gender },
             topics: selected,
             notes,
+            deepReport: true,
           }),
         });
-        const data = await response.json() as CompatibilityResult | { error?: string };
-        if (!response.ok || "error" in data) throw new Error("合盘服务暂时不可用，请稍后重试。");
+        const data = await response.json() as CompatibilityResult | { error?: string; message?: string };
+        if (!response.ok || "error" in data) throw new Error("message" in data && data.message ? data.message : "合盘服务暂时不可用，请稍后重试。");
         setChartResult(data as CompatibilityResult);
       }
       setSubmitted(true);
@@ -206,7 +207,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
         <button className="measure-submit" disabled={loading} onClick={() => void submit()}>
           {loading
             ? ["正在校正并排盘…", "正在识别命盘主轴…", "正在生成深度分析…", "正在核对盘面依据…"][loadingStage]
-            : "开始测算"} <span>{kind === "bazi" || kind === "ziwei" ? "生成命盘与深度解读" : `完整专题 ${config.cost} 积分`}</span> →
+            : "开始测算"} <span>{kind === "bazi" || kind === "ziwei" || kind === "match" ? "生成命盘与 AI 深度解读" : `完整专题 ${config.cost} 积分`}</span> →
         </button>
         <p className="measure-submit-help">点击后将使用已校正的真太阳时生成命盘；基础排盘与本页解读不扣积分。</p>
       </section>
@@ -228,7 +229,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
           {chartResult?.kind === "compatibility" && <CompatibilityView result={chartResult} />}
           {chartResult?.kind === "bazi" && (chartResult.aiReport ? <AiDeepReportView report={chartResult.aiReport} kind="bazi" /> : <BaziNarrativeReport result={chartResult} />)}
           {chartResult?.kind === "ziwei" && (chartResult.aiReport ? <AiDeepReportView report={chartResult.aiReport} kind="ziwei" /> : <ZiweiNarrativeReport result={chartResult} />)}
-          {chartResult?.kind === "compatibility" && <ReportResult report={chartResult.report} />}
+          {chartResult?.kind === "compatibility" && (chartResult.aiReport ? <AiDeepReportView report={chartResult.aiReport} kind="compatibility" /> : <ReportResult report={chartResult.report} />)}
           {!chartResult && (
             <div className="engine-boundary">
               <b>本入口的排盘服务将在下一阶段接入</b>
@@ -715,7 +716,7 @@ function ZiweiNarrativeReport({ result }: { result: ZiweiChartResult }) {
   );
 }
 
-function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi" | "ziwei" }) {
+function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi" | "ziwei" | "compatibility" }) {
   const [activeId, setActiveId] = useState(report.chapters[0]?.id || "overview");
   const active = report.chapters.find((chapter) => chapter.id === activeId) ?? report.chapters[0];
   const evidenceMap = new Map(report.evidenceCatalog.map((item) => [item.id, item.text]));
@@ -725,12 +726,12 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
     <section className="ai-deep-report">
       <header className="ai-report-cover">
         <div>
-          <small>{kind === "bazi" ? "AI · ZI PING EVIDENCE READING" : "AI · ZIWEI EVIDENCE READING"}</small>
-          <p>{kind === "bazi" ? "八字深度解析报告" : "紫微斗数深度解析报告"}</p>
+          <small>{kind === "bazi" ? "AI · ZI PING EVIDENCE READING" : kind === "ziwei" ? "AI · ZIWEI EVIDENCE READING" : "AI · RELATIONSHIP EVIDENCE READING"}</small>
+          <p>{kind === "bazi" ? "八字深度解析报告" : kind === "ziwei" ? "紫微斗数深度解析报告" : "双盘关系深度解析报告"}</p>
           <h3>{report.title}</h3>
           <span>先由固定版本引擎排盘，再由 AI 依据带编号的盘面事实组织分析；系统已检查每一条引用，不允许模型自行补算命盘。</span>
         </div>
-        <aside><small>报告版本</small><b>{report.promptVersion}</b><span>{report.model} · {report.reportId.slice(0, 8)}</span></aside>
+        <aside><small>报告版本</small><b>{report.promptVersion}</b><span>{report.provider.toUpperCase()} · {report.model} · {report.reportId.slice(0, 8)}</span></aside>
       </header>
 
       <section className="ai-direct-answer">

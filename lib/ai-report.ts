@@ -1,4 +1,4 @@
-import type { BaziChartResult, ZiweiChartResult } from "./chart-engines";
+import type { BaziChartResult, CompatibilityResult, ZiweiChartResult } from "./chart-engines";
 
 export type EvidenceItem = { id: string; text: string };
 
@@ -25,6 +25,7 @@ export type AiReportChapter = {
 export type AiDeepReport = {
   status: "generated";
   reportId: string;
+  provider: "groq" | "openai";
   model: string;
   promptVersion: string;
   title: string;
@@ -37,7 +38,7 @@ export type AiDeepReport = {
   quality: { warnings: string[] };
 };
 
-type ReportKind = "bazi" | "ziwei";
+type ReportKind = "bazi" | "ziwei" | "compatibility";
 
 export class AiReportError extends Error {
   code: string;
@@ -48,8 +49,12 @@ export class AiReportError extends Error {
   }
 }
 
-const PROMPT_VERSION = "deep-report-2026-08-01-v1";
-const REQUIRED_CHAPTERS = ["overview", "personality", "career", "wealth", "relationships", "timing"];
+const PROMPT_VERSION = "deep-report-2026-08-03-v2";
+const REQUIRED_CHAPTERS: Record<ReportKind, string[]> = {
+  bazi: ["overview", "personality", "career", "wealth", "relationships", "timing"],
+  ziwei: ["overview", "personality", "career", "wealth", "relationships", "timing"],
+  compatibility: ["overview", "communication", "intimacy", "conflict", "cooperation", "growth"],
+};
 const BANNED_CERTAINTY = /一定结婚|必然结婚|一定离婚|必然离婚|命中注定|保证收益|稳赚|准确率\s*\d|寿命为|活到\d+岁|必有血光|必得重病/;
 
 function evidence(id: string, text: string): EvidenceItem {
@@ -102,6 +107,10 @@ export function buildZiweiEvidence(result: ZiweiChartResult): EvidenceItem[] {
     `${flow.year}年${flow.ganzhi}，虚岁${flow.nominalAge}，流年命宫落${flow.palaceName}`,
   )));
   return items;
+}
+
+export function buildCompatibilityEvidence(result: CompatibilityResult): EvidenceItem[] {
+  return result.evidenceCatalog;
 }
 
 const reportSchema = {
@@ -165,15 +174,20 @@ const reportSchema = {
 function systemInstructions(kind: ReportKind) {
   const method = kind === "bazi"
     ? "使用子平结构分析顺序：输入审计→日主旺衰多路径复核→格局与制化→十神和五行流通→人生模块→大运流年。不可仅凭五行数量、单一十神或神煞下结论。"
-    : "使用紫微斗数综合顺序：命身主轴→十二宫→三方四正→主辅星与四化→大限流年。不可只凭一颗主星、一个宫位或吉凶词下结论。";
+    : kind === "ziwei"
+      ? "使用紫微斗数综合顺序：命身主轴→十二宫→三方四正→主辅星与四化→大限流年。不可只凭一颗主星、一个宫位或吉凶词下结论。"
+      : "使用双盘关系分析顺序：先分别确认双方结构→寻找互动接口→区分互补与摩擦→讨论沟通、亲密、冲突修复、现实协作与共同成长。不得用单一匹配分数或命定标签裁决关系。";
+  const chapterRule = kind === "compatibility"
+    ? "必须完整包含 id 为 overview、communication、intimacy、conflict、cooperation、growth 的六章。"
+    : "必须完整包含 id 为 overview、personality、career、wealth、relationships、timing 的六章；可按用户重点增加 family、health 或 growth。";
   return `你是观辰的资深传统命理报告编辑。${method}
 你的工作是解释服务端已经计算好的命盘，不是重新排盘。只能使用证据目录里的事实；严禁自行补算、改写或发明星曜、宫位、干支、十神、四化、运限。
 写成专业咨询式的简体中文长报告：先直接回应用户最关心的问题，再解释盘面结构、正向表达、压力表达、阶段变化与现实行动。每项核心结论和时间判断必须引用 evidenceRefs；引用只能是目录中存在的编号。
-必须完整包含 id 为 overview、personality、career、wealth、relationships、timing 的六章；可按用户重点增加 family、health 或 growth。每章 narrative 至少三段，每段应有实质内容，避免重复套话。时间章只能使用目录明确提供的大运或流年。
+${chapterRule}每章 narrative 至少三段，每段应有实质内容，避免重复套话。时间判断只能使用目录明确提供的大运或流年；合盘不得把双方阶段不同步写成分手或结婚预言。
 命盘揭示趋势与人生课题，不决定人生。禁止确定性婚期、离婚、疾病、寿命、灾祸、投资收益或法律结果；健康、投资、法律事项只给一般性提醒并建议咨询专业人士。不要伪造古籍引文，不要宣称准确率。`;
 }
 
-function extractOutputText(payload: unknown) {
+function extractOpenAiOutputText(payload: unknown) {
   const response = payload as { status?: string; incomplete_details?: { reason?: string }; output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string; refusal?: string }> }> };
   if (response.status === "incomplete") throw new AiReportError("INCOMPLETE", `模型输出未完成：${response.incomplete_details?.reason || "未知原因"}`);
   for (const item of response.output ?? []) {
@@ -185,16 +199,32 @@ function extractOutputText(payload: unknown) {
   throw new AiReportError("EMPTY_OUTPUT", "模型没有返回可用报告");
 }
 
-function validateReport(report: Omit<AiDeepReport, "status" | "reportId" | "model" | "promptVersion" | "evidenceCatalog" | "quality">, catalog: EvidenceItem[]) {
+function extractGroqOutputText(payload: unknown) {
+  const response = payload as { choices?: Array<{ message?: { content?: string } }> };
+  const content = response.choices?.[0]?.message?.content;
+  if (!content) throw new AiReportError("EMPTY_OUTPUT", "Groq 没有返回可用报告");
+  return content;
+}
+
+type GeneratedReport = Omit<AiDeepReport, "status" | "reportId" | "provider" | "model" | "promptVersion" | "evidenceCatalog" | "quality">;
+
+function validateReport(report: GeneratedReport, catalog: EvidenceItem[], kind: ReportKind) {
   const validIds = new Set(catalog.map((item) => item.id));
   const errors: string[] = [];
+  if (!report || typeof report !== "object") return ["报告不是 JSON 对象"];
+  if (typeof report.title !== "string" || typeof report.directAnswer !== "string") return ["标题或直接回答字段缺失"];
+  if (!Array.isArray(report.coreConclusions) || !Array.isArray(report.chapters)) return ["核心结论或章节字段缺失"];
+  if (!Array.isArray(report.finalSynthesis) || !Array.isArray(report.boundaries)) return ["总结或边界字段缺失"];
+  if (report.coreConclusions.some((item) => !item || !Array.isArray(item.evidenceRefs))) return ["核心结论证据字段无效"];
+  if (report.chapters.some((chapter) => !chapter || !Array.isArray(chapter.evidenceRefs) || !Array.isArray(chapter.timing) || !Array.isArray(chapter.narrative))) return ["章节结构无效"];
+  if (report.chapters.some((chapter) => chapter.timing.some((item) => !item || !Array.isArray(item.evidenceRefs)))) return ["时间线证据字段无效"];
   const references = [
     ...report.coreConclusions.flatMap((item) => item.evidenceRefs),
     ...report.chapters.flatMap((chapter) => [...chapter.evidenceRefs, ...chapter.timing.flatMap((item) => item.evidenceRefs)]),
   ];
   const unknown = [...new Set(references.filter((id) => !validIds.has(id)))];
   if (unknown.length) errors.push(`存在无效证据编号：${unknown.join("、")}`);
-  for (const id of REQUIRED_CHAPTERS) if (!report.chapters.some((chapter) => chapter.id === id)) errors.push(`缺少章节：${id}`);
+  for (const id of REQUIRED_CHAPTERS[kind]) if (!report.chapters.some((chapter) => chapter.id === id)) errors.push(`缺少章节：${id}`);
   if (report.directAnswer.trim().length < 100) errors.push("直接回答过短");
   report.chapters.forEach((chapter) => {
     if (chapter.narrative.join("").length < 260) errors.push(`${chapter.id}章节内容过短`);
@@ -204,6 +234,19 @@ function validateReport(report: Omit<AiDeepReport, "status" | "reportId" | "mode
 }
 
 async function requestStructuredReport(args: {
+  kind: ReportKind;
+  question: string;
+  topics: string[];
+  catalog: EvidenceItem[];
+  correction?: string;
+}) {
+  const provider = (process.env.AI_REPORT_PROVIDER || "groq").toLowerCase();
+  if (provider === "openai") return requestOpenAiReport(args);
+  if (provider === "groq") return requestGroqReport(args);
+  throw new AiReportError("AI_PROVIDER_INVALID", `不支持的 AI 报告服务：${provider}`);
+}
+
+async function requestOpenAiReport(args: {
   kind: ReportKind;
   question: string;
   topics: string[];
@@ -242,31 +285,97 @@ async function requestStructuredReport(args: {
     }
     throw new AiReportError("OPENAI_REQUEST_FAILED", providerMessage || `OpenAI 请求失败（${response.status}）`);
   }
-  const parsed = JSON.parse(extractOutputText(payload)) as Omit<AiDeepReport, "status" | "reportId" | "model" | "promptVersion" | "evidenceCatalog" | "quality">;
-  return { parsed, model };
+  const parsed = parseReportJson(extractOpenAiOutputText(payload));
+  return { parsed, model, provider: "openai" as const };
+}
+
+async function requestGroqReport(args: {
+  kind: ReportKind;
+  question: string;
+  topics: string[];
+  catalog: EvidenceItem[];
+  correction?: string;
+}) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new AiReportError("AI_NOT_CONFIGURED", "免费 AI 报告服务尚未配置，请管理员设置 GROQ_API_KEY");
+  const model = process.env.GROQ_REPORT_MODEL || "qwen/qwen3.6-27b";
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      temperature: 0.55,
+      reasoning_effort: "none",
+      max_completion_tokens: 6500,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `${systemInstructions(args.kind)}\n只返回一个合法 JSON 对象，不要输出 Markdown、代码围栏或额外说明。输出必须符合用户消息中的 outputSchema。`,
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            reportKind: args.kind,
+            question: args.question,
+            selectedTopics: args.topics,
+            evidenceCatalog: args.catalog,
+            correction: args.correction || "",
+            outputSchema: reportSchema,
+          }),
+        },
+      ],
+    }),
+  });
+  const payload = await response.json().catch(() => null) as { error?: { message?: string; code?: string } } | null;
+  if (!response.ok) {
+    const providerMessage = payload?.error?.message || "";
+    if (response.status === 401) throw new AiReportError("AI_AUTHENTICATION_FAILED", "Groq 免费报告服务认证失败，请检查 GROQ_API_KEY");
+    if (response.status === 429) {
+      const retryAfter = response.headers.get("retry-after");
+      throw new AiReportError("AI_RATE_LIMITED", retryAfter ? `Groq 免费额度触发限流，请在 ${retryAfter} 秒后重试` : "Groq 免费额度触发限流，请稍后重试");
+    }
+    if (response.status === 413 || /token|context|too large/i.test(providerMessage)) {
+      throw new AiReportError("AI_TOKEN_LIMIT", "本次盘面资料超过 Groq 免费层限制，请减少分析方向后重试");
+    }
+    throw new AiReportError("GROQ_REQUEST_FAILED", providerMessage || `Groq 请求失败（${response.status}）`);
+  }
+  const parsed = parseReportJson(extractGroqOutputText(payload));
+  return { parsed, model, provider: "groq" as const };
+}
+
+function parseReportJson(content: string): GeneratedReport {
+  try {
+    return JSON.parse(content) as GeneratedReport;
+  } catch {
+    throw new AiReportError("INVALID_JSON", "AI 返回的报告格式无效，请重新生成");
+  }
 }
 
 export async function generateDeepReport(args: {
   kind: ReportKind;
   question?: string;
   topics: string[];
-  chart: BaziChartResult | ZiweiChartResult;
+  chart: BaziChartResult | ZiweiChartResult | CompatibilityResult;
 }): Promise<AiDeepReport> {
   const catalog = args.kind === "bazi"
     ? buildBaziEvidence(args.chart as BaziChartResult)
-    : buildZiweiEvidence(args.chart as ZiweiChartResult);
+    : args.kind === "ziwei"
+      ? buildZiweiEvidence(args.chart as ZiweiChartResult)
+      : buildCompatibilityEvidence(args.chart as CompatibilityResult);
   const question = args.question?.trim() || `请围绕${args.topics.join("、") || "命盘总览"}进行完整分析。`;
   let result = await requestStructuredReport({ kind: args.kind, question, topics: args.topics, catalog });
-  let errors = validateReport(result.parsed, catalog);
+  let errors = validateReport(result.parsed, catalog, args.kind);
   if (errors.length) {
     result = await requestStructuredReport({ kind: args.kind, question, topics: args.topics, catalog, correction: `上一版未通过质量检查，请重写并修复：${errors.join("；")}` });
-    errors = validateReport(result.parsed, catalog);
+    errors = validateReport(result.parsed, catalog, args.kind);
   }
   if (errors.length) throw new AiReportError("REPORT_VALIDATION_FAILED", `报告未通过证据与完整性检查：${errors.join("；")}`);
   return {
     ...result.parsed,
     status: "generated",
     reportId: crypto.randomUUID(),
+    provider: result.provider,
     model: result.model,
     promptVersion: PROMPT_VERSION,
     evidenceCatalog: catalog,

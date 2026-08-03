@@ -174,6 +174,8 @@ export type CompatibilityResult = {
   mode: CompatibilityMode;
   engine: string;
   profiles: Array<{ label: string; headline: string; facts: string[] }>;
+  evidenceCatalog: Array<{ id: string; text: string }>;
+  aiReport?: AiDeepReport;
   report: ChartReport;
 };
 
@@ -555,6 +557,21 @@ export async function generateCompatibility(input: CompatibilityInput): Promise<
       `${element}${first.chart.elements[element] + second.chart.elements[element]}`,
     ).join(" · ");
     const requested = input.topics.length ? input.topics : ["关系总览"];
+    const evidenceCatalog = [
+      { id: "C001", text: `第一方四柱${first.chart.bazi}，日主${first.chart.dayMaster}，日柱${firstDay.stem}${firstDay.branch}` },
+      { id: "C002", text: `第二方四柱${second.chart.bazi}，日主${second.chart.dayMaster}，日柱${secondDay.stem}${secondDay.branch}` },
+      { id: "C003", text: `第一方藏干加权五行：${Object.entries(first.chart.weightedElements).map(([key, value]) => `${key}${value}%`).join("、")}` },
+      { id: "C004", text: `第二方藏干加权五行：${Object.entries(second.chart.weightedElements).map(([key, value]) => `${key}${value}%`).join("、")}` },
+      { id: "C005", text: `第一方旺衰${first.analysis.strength.classification}，格局候选${first.analysis.structure.patternCandidate}，喜用层次${first.analysis.elementFlow.useful.map((item) => `${item.level}${item.element}`).join("、")}` },
+      { id: "C006", text: `第二方旺衰${second.analysis.strength.classification}，格局候选${second.analysis.structure.patternCandidate}，喜用层次${second.analysis.elementFlow.useful.map((item) => `${item.level}${item.element}`).join("、")}` },
+      { id: "C007", text: `两盘表层五行合计：${combined}` },
+      ...first.chart.pillars.map((pillar, index) => ({ id: `C${String(10 + index).padStart(3, "0")}`, text: `第一方${pillar.label}${pillar.stem}${pillar.branch}：十神${pillar.tenGod || "日主"}，藏干${pillar.hiddenStems.join("、") || "无"}，藏干十神${pillar.hiddenTenGods.join("、") || "无"}` })),
+      ...second.chart.pillars.map((pillar, index) => ({ id: `C${String(20 + index).padStart(3, "0")}`, text: `第二方${pillar.label}${pillar.stem}${pillar.branch}：十神${pillar.tenGod || "日主"}，藏干${pillar.hiddenStems.join("、") || "无"}，藏干十神${pillar.hiddenTenGods.join("、") || "无"}` })),
+      ...first.chart.interactions.slice(0, 5).map((item, index) => ({ id: `C${String(30 + index).padStart(3, "0")}`, text: `第一方原局互动：${item}` })),
+      ...second.chart.interactions.slice(0, 5).map((item, index) => ({ id: `C${String(40 + index).padStart(3, "0")}`, text: `第二方原局互动：${item}` })),
+      { id: "C050", text: `第一方近期大运：${first.analysis.decades.slice(0, 4).map((item) => `${item.range}${item.ganzhi}（${item.state}）`).join("、")}` },
+      { id: "C051", text: `第二方近期大运：${second.analysis.decades.slice(0, 4).map((item) => `${item.range}${item.ganzhi}（${item.state}）`).join("、")}` },
+    ];
     const topics = [...new Set(["关系底盘", ...requested, "冲突修复", "共同成长"])].map((topic) => ({
       title: topic,
       evidence: `第一方日柱${firstDay.stem}${firstDay.branch}、日主${first.chart.dayMaster}；第二方日柱${secondDay.stem}${secondDay.branch}、日主${second.chart.dayMaster}；两盘表层五行合计为${combined}。`,
@@ -570,6 +587,7 @@ export async function generateCompatibility(input: CompatibilityInput): Promise<
         { label: "第一方", headline: `${first.chart.dayMaster}日主 · ${first.chart.bazi}`, facts: [`生肖 ${first.chart.zodiac}`, `日支 ${firstDay.branch}`, `五行 ${Object.entries(first.chart.elements).map(([key, value]) => `${key}${value}`).join(" ")}`] },
         { label: "第二方", headline: `${second.chart.dayMaster}日主 · ${second.chart.bazi}`, facts: [`生肖 ${second.chart.zodiac}`, `日支 ${secondDay.branch}`, `五行 ${Object.entries(second.chart.elements).map(([key, value]) => `${key}${value}`).join(" ")}`] },
       ],
+      evidenceCatalog,
       report: {
         summary: "默认采用八字双盘分析，从日主、日支、十神和五行资源观察双方互动；不以“匹配分数”裁决关系。",
         evidence: [`第一方：${first.chart.bazi}`, `第二方：${second.chart.bazi}`, `两盘五行合计：${combined}`],
@@ -588,6 +606,20 @@ export async function generateCompatibility(input: CompatibilityInput): Promise<
     return `${name}${palace?.majorStars.map((star) => star.name).join("、") || "无主星"}`;
   }).join("；");
   const requested = input.topics.length ? input.topics : ["关系总览"];
+  const relationPalaces = ["命宫", "夫妻", "福德", "官禄", "财帛", "迁移", "仆役"];
+  const ziweiEvidence = (label: string, chart: ZiweiChartResult["chart"], offset: number) => [
+    { id: `C${String(offset).padStart(3, "0")}`, text: `${label}命宫${chart.soulPalaceBranch}、身宫${chart.bodyPalaceBranch}，${chart.yinYangGender}，${chart.fiveElementsClass}，命主${chart.soul}、身主${chart.body}` },
+    { id: `C${String(offset + 1).padStart(3, "0")}`, text: `${label}生年四化：${chart.natalMutagens.map((star) => `${star.name}化${star.mutagen}`).join("、") || "资料缺失"}` },
+    { id: `C${String(offset + 2).padStart(3, "0")}`, text: `${label}当前大限${chart.currentFortune.decadal.range.join("—")}岁落${chart.currentFortune.decadal.palaceName}，当前流年落${chart.currentFortune.yearly.palaceName}` },
+    ...relationPalaces.map((name, index) => {
+      const palace = findPalace(chart, [name]);
+      return {
+        id: `C${String(offset + 3 + index).padStart(3, "0")}`,
+        text: `${label}${name}${palace?.heavenlyStem || ""}${palace?.earthlyBranch || ""}：主星${palace?.majorStars.map((star) => `${star.name}${star.mutagen ? `化${star.mutagen}` : ""}`).join("、") || "无十四主星"}；辅星${palace?.minorStars.slice(0, 6).map((star) => star.name).join("、") || "无"}`,
+      };
+    }),
+  ];
+  const evidenceCatalog = [...ziweiEvidence("第一方", first.chart, 1), ...ziweiEvidence("第二方", second.chart, 20)];
   const topics = [...new Set(["命身互动", ...requested, "夫妻与福德", "现实协作"])].map((topic) => ({
     title: topic,
     evidence: `第一方命宫${first.chart.soulPalaceBranch}（${palaceEvidence(first.chart, ["命宫", "夫妻", "福德"])}）；第二方命宫${second.chart.soulPalaceBranch}（${palaceEvidence(second.chart, ["命宫", "夫妻", "福德"])}）。`,
@@ -603,6 +635,7 @@ export async function generateCompatibility(input: CompatibilityInput): Promise<
       { label: "第一方", headline: `${first.chart.yinYangGender} · ${first.chart.fiveElementsClass}`, facts: [`命宫 ${first.chart.soulPalaceBranch}`, `身宫 ${first.chart.bodyPalaceBranch}`, `命主 ${first.chart.soul} · 身主 ${first.chart.body}`] },
       { label: "第二方", headline: `${second.chart.yinYangGender} · ${second.chart.fiveElementsClass}`, facts: [`命宫 ${second.chart.soulPalaceBranch}`, `身宫 ${second.chart.bodyPalaceBranch}`, `命主 ${second.chart.soul} · 身主 ${second.chart.body}`] },
     ],
+    evidenceCatalog,
     report: {
       summary: "紫微双盘分析并置双方命身、夫妻与福德结构，帮助讨论彼此如何感受、表达和修复，不提供绝对匹配分数。",
       evidence: [`第一方：${palaceEvidence(first.chart, ["命宫", "夫妻", "福德"])}`, `第二方：${palaceEvidence(second.chart, ["命宫", "夫妻", "福德"])}`],

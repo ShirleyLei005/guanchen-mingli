@@ -1,5 +1,6 @@
 if (process.env.AI_SMOKE_MOCK === "1") {
-  process.env.OPENAI_API_KEY = "mock-key-used-only-for-local-structure-test";
+  process.env.AI_REPORT_PROVIDER = "groq";
+  process.env.GROQ_API_KEY = "mock-key-used-only-for-local-structure-test";
   const paragraph = "命盘提供的是一种观察结构：先核对盘面中的动力如何相互支持，再把它放回当事人的经历、资源和现实选择中理解。优势与压力往往来自同一倾向，建设性表达需要清晰边界、持续练习和可复盘的行动；任何阶段提示都不能代替真实反馈与专业判断。";
   const chapter = (id, title, refs) => ({
     id, title, headline: `${title}：从盘面趋势回到现实选择`,
@@ -32,7 +33,7 @@ if (process.env.AI_SMOKE_MOCK === "1") {
     boundaries: ["传统文化娱乐与自我反思参考。", "不替代医疗、投资或法律意见。", "不以单一星曜或流年决定人生。"],
   };
   globalThis.fetch = async (input) => {
-    if (String(input).includes("api.openai.com/v1/responses")) return Response.json({ output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(mockReport) }] }] });
+    if (String(input).includes("api.groq.com/openai/v1/chat/completions")) return Response.json({ choices: [{ message: { content: JSON.stringify(mockReport) } }] });
     throw new Error(`Unexpected fetch in mock smoke test: ${String(input)}`);
   };
 }
@@ -70,6 +71,7 @@ const cited = [
 const invalidEvidence = [...new Set(cited.filter((id) => !validEvidence.has(id)))];
 console.log(JSON.stringify({
   status: result.aiReport.status,
+  provider: result.aiReport.provider,
   model: result.aiReport.model,
   chapterIds: result.aiReport.chapters.map((chapter) => chapter.id),
   directAnswerLength: result.aiReport.directAnswer.length,
