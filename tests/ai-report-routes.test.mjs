@@ -41,9 +41,19 @@ async function getWorkerWithDeepSeekMock() {
     const request = JSON.parse(String(init?.body || "{}"));
     const context = JSON.parse(request.messages[1].content);
     const full = mockReport(context.reportKind);
-    const output = context.chapterId
+    let output = context.chapterId
       ? full.chapters.find((chapter) => chapter.id === context.chapterId)
       : { title: full.title, directAnswer: full.directAnswer, coreConclusions: full.coreConclusions, finalSynthesis: full.finalSynthesis, boundaries: full.boundaries };
+    if (context.chapterId === "relationships" || context.chapterId === "family") {
+      output = {
+        ...output,
+        narrative: [
+          `${output.narrative[0]}这不是命中注定，而是需要结合现实经历持续验证的观察角度。`,
+          output.narrative[1],
+          output.narrative.slice(2).join(""),
+        ],
+      };
+    }
     return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify(output) } }] });
   };
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -73,6 +83,7 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
     assert.equal(result.aiReport.provider, "deepseek");
     assert.equal(result.aiReport.model, "deepseek-v4-flash");
     assert.equal(result.aiReport.chapters.length, path.includes("compatibility") ? 6 : 7);
+    assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.length === 4), true);
     const valid = new Set(result.aiReport.evidenceCatalog.map((item) => item.id));
     const cited = result.aiReport.chapters.flatMap((chapter) => [...chapter.evidenceRefs, ...chapter.timing.flatMap((item) => item.evidenceRefs)]);
     assert.equal(cited.every((id) => valid.has(id)), true);

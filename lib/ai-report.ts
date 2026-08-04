@@ -49,13 +49,57 @@ export class AiReportError extends Error {
   }
 }
 
-const PROMPT_VERSION = "deep-report-2026-08-04-v5";
+const PROMPT_VERSION = "deep-report-2026-08-04-v6";
 const REQUIRED_CHAPTERS: Record<ReportKind, string[]> = {
   bazi: ["overview", "career_wealth", "relationships", "health", "children", "family", "timing"],
   ziwei: ["overview", "career_wealth", "relationships", "health", "children", "family", "timing"],
   compatibility: ["overview", "communication", "intimacy", "conflict", "cooperation", "growth"],
 };
-const BANNED_CERTAINTY = /一定结婚|必然结婚|一定离婚|必然离婚|命中注定|保证收益|稳赚|准确率\s*\d|寿命为|活到\d+岁|必有血光|必得重病/;
+const BANNED_CERTAINTY = /一定结婚|必然结婚|一定离婚|必然离婚|命中注定|保证收益|稳赚|准确率\s*\d|寿命为|活到\d+岁|必有血光|必得重病/g;
+const NEGATED_CERTAINTY = /(?:并非|不是|不可|不能|不会|避免|禁止|不得|不要|不应|非)[^，。；！？]{0,10}$/;
+
+function hasBannedCertainty(text: string) {
+  for (const match of text.matchAll(BANNED_CERTAINTY)) {
+    const index = match.index ?? 0;
+    const prefix = text.slice(Math.max(0, index - 16), index);
+    if (!NEGATED_CERTAINTY.test(prefix)) return true;
+  }
+  return false;
+}
+
+function splitNarrativeParagraph(text: string): [string, string] {
+  const midpoint = Math.floor(text.length / 2);
+  const candidates: number[] = [];
+  for (let index = 0; index < text.length; index += 1) {
+    if ("。！？；，".includes(text[index]) && index >= 30 && text.length - index >= 30) candidates.push(index + 1);
+  }
+  const splitAt = candidates.sort((left, right) => Math.abs(left - midpoint) - Math.abs(right - midpoint))[0]
+    ?? Math.max(1, midpoint);
+  return [text.slice(0, splitAt).trim(), text.slice(splitAt).trim()];
+}
+
+function normalizeNarrative(narrative: string[]) {
+  const paragraphs = narrative.map((item) => item.trim()).filter(Boolean);
+  while (paragraphs.length < 4 && paragraphs.length) {
+    const longestIndex = paragraphs.reduce(
+      (best, item, index) => item.length > paragraphs[best].length ? index : best,
+      0,
+    );
+    const [first, second] = splitNarrativeParagraph(paragraphs[longestIndex]);
+    if (!first || !second) break;
+    paragraphs.splice(longestIndex, 1, first, second);
+  }
+  if (paragraphs.length > 4) paragraphs.splice(3, paragraphs.length - 3, paragraphs.slice(3).join("\n"));
+  return paragraphs;
+}
+
+function normalizeGeneratedReport(report: GeneratedReport) {
+  if (!report || !Array.isArray(report.chapters)) return report;
+  report.chapters.forEach((chapter) => {
+    if (Array.isArray(chapter?.narrative)) chapter.narrative = normalizeNarrative(chapter.narrative);
+  });
+  return report;
+}
 
 function evidence(id: string, text: string): EvidenceItem {
   return { id, text };
@@ -241,7 +285,7 @@ function validateReport(report: GeneratedReport, catalog: EvidenceItem[], kind: 
     ].join("");
     if (chapterContent.length < 520) errors.push(`${chapter.id}章节内容过短`);
   });
-  if (BANNED_CERTAINTY.test(JSON.stringify(report))) errors.push("出现禁止的确定性断言");
+  if (hasBannedCertainty(JSON.stringify(report))) errors.push("出现禁止的确定性断言");
   return errors;
 }
 
@@ -610,12 +654,14 @@ export async function generateDeepReport(args: {
       : buildCompatibilityEvidence(args.chart as CompatibilityResult);
   const question = args.question?.trim() || `请围绕${args.topics.join("、") || "命盘总览"}进行完整分析。`;
   let result = await requestStructuredReport({ kind: args.kind, question, topics: args.topics, catalog });
+  normalizeGeneratedReport(result.parsed);
   result.parsed.chapters = REQUIRED_CHAPTERS[args.kind]
     .map((id) => result.parsed.chapters.find((chapter) => chapter.id === id))
     .filter((chapter): chapter is AiReportChapter => Boolean(chapter));
   let errors = validateReport(result.parsed, catalog, args.kind);
   if (errors.length) {
     result = await requestStructuredReport({ kind: args.kind, question, topics: args.topics, catalog, correction: `上一版未通过质量检查，请重写并修复：${errors.join("；")}` });
+    normalizeGeneratedReport(result.parsed);
     result.parsed.chapters = REQUIRED_CHAPTERS[args.kind]
       .map((id) => result.parsed.chapters.find((chapter) => chapter.id === id))
       .filter((chapter): chapter is AiReportChapter => Boolean(chapter));

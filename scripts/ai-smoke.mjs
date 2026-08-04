@@ -84,6 +84,7 @@ console.log(JSON.stringify({
   chapterIds: result.aiReport.chapters.map((chapter) => chapter.id),
   directAnswerLength: result.aiReport.directAnswer.length,
   chapterLengths: result.aiReport.chapters.map((chapter) => chapter.narrative.join("").length),
+  paragraphCounts: result.aiReport.chapters.map((chapter) => chapter.narrative.length),
   evidenceCount: result.aiReport.evidenceCatalog.length,
   invalidEvidence,
 }));
