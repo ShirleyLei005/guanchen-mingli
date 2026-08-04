@@ -77,6 +77,8 @@ test("public report UI hides internal version and evidence identifiers", async (
   assert.doesNotMatch(source, /<summary>\{ref\}<\/summary>/);
   assert.match(source, /为什么这样判断/);
   assert.match(source, /盘面事实 \{index \+ 1\}/);
+  assert.doesNotMatch(source, /AI · ZI PING EVIDENCE READING|先由固定版本引擎完成排盘/);
+  assert.doesNotMatch(source, /BAZI MCP|ZIWEI MCP CONTRACT|BOUND CHART/);
 });
 
 test("contains commercial data model and safety copy", async () => {

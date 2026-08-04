@@ -49,7 +49,7 @@ export class AiReportError extends Error {
   }
 }
 
-const PROMPT_VERSION = "deep-report-2026-08-04-v3";
+const PROMPT_VERSION = "deep-report-2026-08-04-v4";
 const REQUIRED_CHAPTERS: Record<ReportKind, string[]> = {
   bazi: ["overview", "personality", "career", "wealth", "relationships", "timing"],
   ziwei: ["overview", "personality", "career", "wealth", "relationships", "timing"],
@@ -138,7 +138,7 @@ const reportSchema = {
         required: ["id", "title", "headline", "narrative", "evidenceRefs", "evidenceExplanation", "constructiveExpression", "pressureExpression", "timing", "reflectionQuestions", "actions"],
         properties: {
           id: { type: "string" }, title: { type: "string" }, headline: { type: "string" },
-          narrative: { type: "array", minItems: 3, maxItems: 6, items: { type: "string" } },
+          narrative: { type: "array", minItems: 4, maxItems: 4, items: { type: "string" } },
           evidenceRefs: { type: "array", minItems: 2, items: { type: "string" } },
           evidenceExplanation: { type: "array", minItems: 2, maxItems: 5, items: { type: "string" } },
           constructiveExpression: { type: "string" }, pressureExpression: { type: "string" },
@@ -183,7 +183,7 @@ function systemInstructions(kind: ReportKind) {
   return `你是观辰的资深传统命理报告编辑。${method}
 你的工作是解释服务端已经计算好的命盘，不是重新排盘。只能使用证据目录里的事实；严禁自行补算、改写或发明星曜、宫位、干支、十神、四化、运限。
 写成专业但通俗的简体中文咨询报告，避免堆砌术语。必须使用命理术语时，紧接着用日常语言解释它对工作、关系、情绪或选择意味着什么。先直接回应用户最关心的问题，再解释盘面结构、正向表达、压力表达、阶段变化与现实行动。每项核心结论和时间判断必须引用 evidenceRefs；引用只能是目录中存在的编号。
-${chapterRule}每章 narrative 正好三段，每段80至140个汉字：第一段直接说“这意味着什么”，第二段解释“为什么这样判断”，第三段说明“现实中怎么观察和运用”；避免重复套话。evidenceExplanation 必须把盘面事实与结论之间的逻辑讲清楚，不能只复述证据。每章 timing 最多三项、actions 两至三项，行动建议要具体到可执行步骤。时间判断只能使用目录明确提供的大运或流年；合盘不得把双方阶段不同步写成分手或结婚预言。
+${chapterRule}每章 narrative 正好四段，每段90至160个汉字：第一段直接说明这组结构对当事人意味着什么；第二段结合至少两条盘面依据解释为什么；第三段给出二至三个容易在工作、关系、情绪或决策中被本人认出的具体表现，并同时写出顺境与压力下的差别；第四段说明如何在现实中验证、调整和运用。不要写“你很重感情、偶尔敏感”一类适用于多数人的空泛句子，不要重复套话。evidenceExplanation 必须用日常语言把多条盘面事实如何共同支持结论讲清楚，不能只复述证据。directAnswer 应先给清晰结论，再给关键依据和当前最值得留意的现实课题。每章 timing 最多三项、actions 两至三项，行动建议要具体到可执行步骤、观察信号和复盘方式。时间判断只能使用目录明确提供的大运或流年；合盘不得把双方阶段不同步写成分手或结婚预言。
 命盘揭示趋势与人生课题，不决定人生。禁止确定性婚期、离婚、疾病、寿命、灾祸、投资收益或法律结果；健康、投资、法律事项只给一般性提醒并建议咨询专业人士。不要伪造古籍引文，不要宣称准确率。`;
 }
 
@@ -229,6 +229,8 @@ function validateReport(report: GeneratedReport, catalog: EvidenceItem[], kind: 
   for (const id of REQUIRED_CHAPTERS[kind]) if (!report.chapters.some((chapter) => chapter.id === id)) errors.push(`缺少章节：${id}`);
   if (report.directAnswer.trim().length < 100) errors.push("直接回答过短");
   report.chapters.forEach((chapter) => {
+    if (chapter.narrative.length !== 4) errors.push(`${chapter.id}章节段落数量不完整`);
+    if (chapter.narrative.join("").length < 320) errors.push(`${chapter.id}章节正文过短`);
     const chapterContent = [
       ...chapter.narrative,
       ...chapter.evidenceExplanation,
@@ -237,7 +239,7 @@ function validateReport(report: GeneratedReport, catalog: EvidenceItem[], kind: 
       ...chapter.timing.flatMap((item) => [item.theme, item.opportunity, item.caution]),
       ...chapter.actions.flatMap((item) => [item.title, item.detail]),
     ].join("");
-    if (chapterContent.length < 500) errors.push(`${chapter.id}章节内容过短`);
+    if (chapterContent.length < 520) errors.push(`${chapter.id}章节内容过短`);
   });
   if (BANNED_CERTAINTY.test(JSON.stringify(report))) errors.push("出现禁止的确定性断言");
   return errors;
@@ -268,61 +270,63 @@ async function requestDeepSeekReport(args: {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new AiReportError("AI_NOT_CONFIGURED", "DeepSeek 深度报告服务尚未配置，请管理员设置 DEEPSEEK_API_KEY");
   const model = process.env.DEEPSEEK_REPORT_MODEL || "deepseek-v4-flash";
+  const chapterTitles: Record<string, string> = {
+    overview: "命格总览", personality: "性格特质", career: "事业发展", wealth: "财富与资源",
+    relationships: "感情关系", timing: "阶段节奏", communication: "沟通模式", intimacy: "亲密需求",
+    conflict: "冲突修复", cooperation: "现实协作", growth: "共同成长",
+  };
+  const context = { reportKind: args.kind, question: args.question, selectedTopics: args.topics, evidenceCatalog: args.catalog, correction: args.correction || "" };
+  const jobs: Array<() => Promise<unknown>> = [
+    () => callDeepSeekJson({
+      apiKey, model, maxTokens: 2400,
+      system: `${systemInstructions(args.kind)}\n本次只生成整份报告的总览对象，不生成 chapters。directAnswer 为180至300字；coreConclusions 正好3项；finalSynthesis 正好3至5项；boundaries 正好3项。只返回合法 JSON。`,
+      user: { ...context, requiredJsonShape: { title: "报告标题", directAnswer: "直接回应", coreConclusions: [{ title: "标题", conclusion: "结论", evidenceRefs: ["有效证据编号"] }], finalSynthesis: ["综合收束"], boundaries: ["分析边界"] } },
+    }),
+    ...REQUIRED_CHAPTERS[args.kind].map((id) => () => callDeepSeekJson({
+      apiKey, model, maxTokens: 3000,
+      system: `${systemInstructions(args.kind)}\n本次忽略整份 chapters 数组的格式要求，只生成“${chapterTitles[id]}”一个章节对象。id 必须为 ${id}；narrative 正好4段，每段90至150字，并包含具体生活场景；evidenceRefs 2至3项；evidenceExplanation 正好2至3项；timing 最多1项；reflectionQuestions 正好2项；actions 正好2项。只返回合法 JSON。`,
+      user: { ...context, chapterId: id, chapterTitle: chapterTitles[id], requiredJsonShape: { id, title: chapterTitles[id], headline: "本章核心判断", narrative: ["含义", "依据", "具体表现", "验证与运用"], evidenceRefs: ["有效证据编号1", "有效证据编号2"], evidenceExplanation: ["推导说明1", "推导说明2"], constructiveExpression: "顺势发挥时", pressureExpression: "容易卡住时", timing: [{ period: "证据明确的阶段", theme: "主题", evidenceRefs: ["有效证据编号"], opportunity: "可把握", caution: "需留意" }], reflectionQuestions: ["问题1", "问题2"], actions: [{ horizon: "时间范围", title: "行动", detail: "步骤与观察信号" }, { horizon: "时间范围", title: "行动", detail: "步骤与复盘方式" }] } },
+    })),
+  ];
+  const outputs: unknown[] = [];
+  for (let index = 0; index < jobs.length; index += 4) outputs.push(...await Promise.all(jobs.slice(index, index + 4).map((job) => job())));
+  const chapters = outputs.slice(1) as AiReportChapter[];
+  const summary = outputs[0] as Partial<Omit<GeneratedReport, "chapters">>;
+  const coreConclusions = Array.isArray(summary.coreConclusions) ? summary.coreConclusions : [];
+  const parsed: GeneratedReport = {
+    title: summary.title || (args.kind === "compatibility" ? "看见彼此的互动，也保留共同选择" : "在趋势中辨认课题，在选择中塑造人生"),
+    directAnswer: summary.directAnswer || coreConclusions.map((item) => item.conclusion).join("\n"),
+    coreConclusions,
+    chapters,
+    finalSynthesis: Array.isArray(summary.finalSynthesis) ? summary.finalSynthesis : chapters.slice(0, 3).map((chapter) => chapter.constructiveExpression),
+    boundaries: Array.isArray(summary.boundaries) ? summary.boundaries : ["传统文化娱乐与自我反思参考。", "不替代医疗、投资或法律等专业意见。", "命盘揭示趋势与课题，不决定人生或关系。"],
+  };
+  return { parsed, model, provider: "deepseek" as const };
+}
+
+async function callDeepSeekJson(args: { apiKey: string; model: string; maxTokens: number; system: string; user: unknown }) {
   let response: Response;
   try {
     response = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${args.apiKey}` },
       signal: AbortSignal.timeout(120_000),
-      body: JSON.stringify({
-        model,
-        stream: false,
-        thinking: { type: "disabled" },
-        temperature: 0.45,
-        max_tokens: 8_000,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: `${systemInstructions(args.kind)}\n只返回一个合法 JSON 对象，不要输出 Markdown、代码围栏或额外说明。必须完整输出全部章节，JSON 字段严格遵循用户消息中的 outputSchema。`,
-          },
-          {
-            role: "user",
-            content: JSON.stringify({
-              reportKind: args.kind,
-              question: args.question,
-              selectedTopics: args.topics,
-              evidenceCatalog: args.catalog,
-              correction: args.correction || "",
-              outputSchema: reportSchema,
-            }),
-          },
-        ],
-      }),
+      body: JSON.stringify({ model: args.model, stream: false, thinking: { type: "disabled" }, temperature: 0.4, max_tokens: args.maxTokens, response_format: { type: "json_object" }, messages: [{ role: "system", content: args.system }, { role: "user", content: JSON.stringify(args.user) }] }),
     });
   } catch (error) {
-    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-      throw new AiReportError("AI_TIMEOUT", "DeepSeek 生成超时，本次请求已停止，请稍后重试");
-    }
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new AiReportError("AI_TIMEOUT", "DeepSeek 生成超时，本次请求已停止，请稍后重试");
     throw new AiReportError("DEEPSEEK_REQUEST_FAILED", "无法连接 DeepSeek 服务，请稍后重试");
   }
-  const payload = await response.json().catch(() => null) as { error?: { message?: string; code?: string } } | null;
+  const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
   if (!response.ok) {
-    const providerMessage = payload?.error?.message || "";
-    if (response.status === 401 || /invalid.*key|authentication|unauthorized/i.test(providerMessage)) {
-      throw new AiReportError("AI_AUTHENTICATION_FAILED", "DeepSeek 服务认证失败，请检查 DEEPSEEK_API_KEY");
-    }
-    if (response.status === 402 || /balance|余额|insufficient/i.test(providerMessage)) {
-      throw new AiReportError("AI_QUOTA_EXHAUSTED", "DeepSeek API 余额不足，请检查账户余额");
-    }
+    const message = payload?.error?.message || "";
+    if (response.status === 401 || /invalid.*key|authentication|unauthorized/i.test(message)) throw new AiReportError("AI_AUTHENTICATION_FAILED", "DeepSeek 服务认证失败，请检查 DEEPSEEK_API_KEY");
+    if (response.status === 402 || /balance|余额|insufficient/i.test(message)) throw new AiReportError("AI_QUOTA_EXHAUSTED", "DeepSeek API 余额不足，请检查账户余额");
     if (response.status === 429) throw new AiReportError("AI_RATE_LIMITED", "DeepSeek 请求较多，请稍后重试");
-    if (response.status === 413 || /token|context|too large/i.test(providerMessage)) {
-      throw new AiReportError("AI_TOKEN_LIMIT", "本次盘面资料超过 DeepSeek 上下文限制，请减少分析方向后重试");
-    }
-    throw new AiReportError("DEEPSEEK_REQUEST_FAILED", providerMessage || `DeepSeek 请求失败（${response.status}）`);
+    if (response.status === 413 || /token|context|too large/i.test(message)) throw new AiReportError("AI_TOKEN_LIMIT", "本次盘面资料超过 DeepSeek 上下文限制，请稍后重试");
+    throw new AiReportError("DEEPSEEK_REQUEST_FAILED", message || `DeepSeek 请求失败（${response.status}）`);
   }
-  const parsed = parseReportJson(extractGroqOutputText(payload));
-  return { parsed, model, provider: "deepseek" as const };
+  return parseJsonObject(extractGroqOutputText(payload));
 }
 
 async function requestSiliconFlowReport(args: {

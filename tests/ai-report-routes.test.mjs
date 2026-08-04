@@ -19,7 +19,7 @@ function mockReport(kind) {
     ],
     chapters: chapters.map(([id, title]) => ({
       id, title, headline: `${title}：从盘面趋势回到现实选择`,
-      narrative: [paragraph, paragraph, paragraph],
+      narrative: [paragraph, paragraph, paragraph, paragraph],
       evidenceRefs: refs,
       evidenceExplanation: ["第一条证据说明本章的结构起点。", "第二条证据用于交叉校正，避免单点判断。"],
       constructiveExpression: "当资源、边界与行动节奏一致时，这组倾向更容易表现为稳定、清晰和可持续的能力。",
@@ -40,7 +40,11 @@ async function getWorkerWithDeepSeekMock() {
     assert.match(String(input), /api\.deepseek\.com\/chat\/completions/);
     const request = JSON.parse(String(init?.body || "{}"));
     const context = JSON.parse(request.messages[1].content);
-    return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify(mockReport(context.reportKind)) } }] });
+    const full = mockReport(context.reportKind);
+    const output = context.chapterId
+      ? full.chapters.find((chapter) => chapter.id === context.chapterId)
+      : { title: full.title, directAnswer: full.directAnswer, coreConclusions: full.coreConclusions, finalSynthesis: full.finalSynthesis, boundaries: full.boundaries };
+    return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify(output) } }] });
   };
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("ai-routes", `${process.pid}-${Date.now()}-${Math.random()}`);

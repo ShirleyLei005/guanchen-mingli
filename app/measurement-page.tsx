@@ -251,7 +251,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
       {submitted && primaryBirth && (
         <section className="measure-result" id="measurement-result">
           <div>
-            <p>CHART &amp; REPORT</p><h2>{chartResult ? `${primaryBirth.name}${kind === "match" && secondaryBirth ? `与${secondaryBirth.name}` : ""}的排盘与解读报告` : "出生坐标与排盘时间已确认"}</h2>
+            <p>命盘与解读</p><h2>{chartResult ? `${primaryBirth.name}${kind === "match" && secondaryBirth ? `与${secondaryBirth.name}` : ""}的排盘与解读报告` : "出生坐标与排盘时间已确认"}</h2>
             <span>{chartResult ? "以下盘面由固定版本服务端引擎计算；每项解读都标明盘面依据。" : "已完成输入核对，后续产品将继续绑定同一命盘版本。"}</span>
           </div>
           <div className="verified-grid">
@@ -283,8 +283,7 @@ function BaziResult({ result }: { result: BaziChartResult }) {
   return (
     <div className="chart-output">
       <div className="chart-output-head">
-        <div><small>BAZI MCP</small><h3>{result.chart.bazi}</h3></div>
-        <span>{result.engine.provider} · {result.engine.tool} · v{result.engine.version}</span>
+        <div><small>四柱命盘</small><h3>{result.chart.bazi}</h3></div>
       </div>
       <div className="bazi-pillars">
         {result.chart.pillars.map((pillar) => (
@@ -323,7 +322,6 @@ function BaziNarrativeReport({ result }: { result: BaziChartResult }) {
     <section className="bazi-reading">
       <header className="bazi-reading-cover">
         <div>
-          <small>ZI PING STRUCTURAL READING</small>
           <p>子平八字结构分析</p>
           <h3>{analysis.strength.classification} · {analysis.structure.patternCandidate}</h3>
           <span>先复核旺衰与格局，再讨论性格、能力、事业、财富、关系和阶段变量。所有人事结论都保留四柱、藏干、十神与大运依据。</span>
@@ -496,8 +494,7 @@ function ZiweiResult({ result }: { result: ZiweiChartResult }) {
   return (
     <div className="chart-output">
       <div className="chart-output-head">
-        <div><small>ZIWEI MCP CONTRACT</small><h3>命宫在{result.chart.soulPalaceBranch} · {result.chart.fiveElementsClass}</h3></div>
-        <span>{result.engine.provider} 契约 · {result.engine.adapter} v{result.engine.version}</span>
+        <div><small>紫微十二宫命盘</small><h3>命宫在{result.chart.soulPalaceBranch} · {result.chart.fiveElementsClass}</h3></div>
       </div>
       <div className="ziwei-workbench">
         <div className="ziwei-board-column">
@@ -518,8 +515,8 @@ function ZiweiResult({ result }: { result: ZiweiChartResult }) {
                       </span>
                     )) : <span className="empty-star">无十四主星</span>}
                   </div>
-                  <p className="ziwei-stars ziwei-minor-stars">{palace.minorStars.map((star) => star.name).join(" ")}</p>
-                  <p className="ziwei-stars ziwei-adjective-stars">{palace.adjectiveStars.map((star) => star.name).join(" ")}</p>
+                  <p className="ziwei-stars ziwei-minor-stars">{palace.minorStars.slice(0, 8).map((star) => star.name).join(" ")}</p>
+                  <p className="ziwei-stars ziwei-adjective-stars">{palace.adjectiveStars.slice(0, 6).map((star) => star.name).join(" ")}</p>
                   <footer>
                     <span>{palace.heavenlyStem}{palace.earthlyBranch}</span>
                     <b>{palace.name}{palace.isBodyPalace ? " · 身" : ""}</b>
@@ -589,7 +586,7 @@ function ZiweiResult({ result }: { result: ZiweiChartResult }) {
             </>
           ) : (
             <div className="ziwei-chat-panel">
-              <p>BOUND CHART · {result.chartId || "NO CHART ID"}</p>
+              <p>基于当前命盘继续分析</p>
               <h4>基于这张命盘继续提问</h4>
               <span>系统会按问题自动调用 interpret_chart；涉及今年、明年、流年或大限时，改用 analyze_fortune。</span>
               <textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="例如：未来一年事业上最值得准备的课题是什么？" />
@@ -617,7 +614,6 @@ function ZiweiResult({ result }: { result: ZiweiChartResult }) {
           <span key={year.year} className={year.year === result.chart.currentFortune.targetYear ? "current" : ""}><b>{year.year}</b><small>{year.nominalAge} 岁 · {year.ganzhi}<br />{year.palaceName}</small></span>
         ))}</div>
       </div>
-      <p className="adapter-note">{result.engine.reason}</p>
     </div>
   );
 }
@@ -626,8 +622,7 @@ function CompatibilityView({ result }: { result: CompatibilityResult }) {
   return (
     <div className="chart-output compatibility-output">
       <div className="chart-output-head">
-        <div><small>{result.mode === "bazi" ? "BAZI SYNASTRY" : "ZIWEI SYNASTRY"}</small><h3>{result.mode === "bazi" ? "八字合盘分析" : "紫微斗数合盘分析"}</h3></div>
-        <span>{result.engine}</span>
+        <div><small>双人命盘</small><h3>{result.mode === "bazi" ? "八字合盘分析" : "紫微斗数合盘分析"}</h3></div>
       </div>
       <div className="compatibility-profiles">
         {result.profiles.map((profile) => (
@@ -651,10 +646,9 @@ function ZiweiNarrativeReport({ result }: { result: ZiweiChartResult }) {
     <section className="ziwei-reading">
       <header className="reading-cover">
         <div>
-          <small>PERSONAL CHART READING</small>
           <p>紫微斗数个人命盘解析</p>
           <h3>{general.headline}</h3>
-          <span>命盘用于发现人生课题，不替你决定人生。以下内容由 interpret_chart 在固定 chartId 上生成，并保留宫位、星曜、四化与运限依据。</span>
+          <span>命盘用于发现人生课题，不替你决定人生。以下内容会结合宫位、星曜、四化与运限交叉判断，并回到真实经历中验证。</span>
         </div>
         <aside>
           <small>本次优先回应</small>
@@ -762,10 +756,8 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
     <section className="ai-deep-report">
       <header className="ai-report-cover">
         <div>
-          <small>{kind === "bazi" ? "AI · ZI PING EVIDENCE READING" : kind === "ziwei" ? "AI · ZIWEI EVIDENCE READING" : "AI · RELATIONSHIP EVIDENCE READING"}</small>
           <p>{kind === "bazi" ? "八字深度解析报告" : kind === "ziwei" ? "紫微斗数深度解析报告" : "双盘关系深度解析报告"}</p>
           <h3>{report.title}</h3>
-          <span>先由固定版本引擎完成排盘，再由 AI 根据结构化盘面事实组织分析。盘面计算与文字解读相互独立，系统会核对引用关系，不允许模型自行补算命盘。</span>
         </div>
       </header>
 
@@ -800,7 +792,7 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
         </section>
 
         <section className="ai-evidence-section">
-          <header><small>为什么这样判断</small><p>下面展示排盘引擎返回的事实，以及这些事实与结论之间的推导关系。</p></header>
+          <header><small>为什么这样判断</small><p>这些命盘线索共同构成本节判断，不以单一信息下结论。</p></header>
           <EvidenceFacts refs={active.evidenceRefs} evidenceMap={evidenceMap} />
           <div>{active.evidenceExplanation.map((item, index) => <p key={`${active.id}-e-${index}`}>{item}</p>)}</div>
         </section>

@@ -4,7 +4,7 @@ if (process.env.AI_SMOKE_MOCK === "1") {
   const paragraph = "命盘提供的是一种观察结构：先核对盘面中的动力如何相互支持，再把它放回当事人的经历、资源和现实选择中理解。优势与压力往往来自同一倾向，建设性表达需要清晰边界、持续练习和可复盘的行动；任何阶段提示都不能代替真实反馈与专业判断。";
   const chapter = (id, title, refs) => ({
     id, title, headline: `${title}：从盘面趋势回到现实选择`,
-    narrative: [paragraph, paragraph, paragraph],
+    narrative: [paragraph, paragraph, paragraph, paragraph],
     evidenceRefs: refs,
     evidenceExplanation: ["第一条证据说明本章的结构起点。", "第二条证据用于交叉校正，避免单点判断。"],
     constructiveExpression: "当资源、边界与行动节奏彼此一致时，这组倾向更容易表现为稳定、清晰和可持续的能力。",
@@ -32,8 +32,15 @@ if (process.env.AI_SMOKE_MOCK === "1") {
     finalSynthesis: ["把盘面当作问题地图。", "用现实反馈校正判断。", "最终决定权始终在自己手中。"],
     boundaries: ["传统文化娱乐与自我反思参考。", "不替代医疗、投资或法律意见。", "不以单一星曜或流年决定人生。"],
   };
-  globalThis.fetch = async (input) => {
-    if (String(input).includes("api.deepseek.com/chat/completions")) return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify(mockReport) } }] });
+  globalThis.fetch = async (input, init) => {
+    if (String(input).includes("api.deepseek.com/chat/completions")) {
+      const request = JSON.parse(String(init?.body || "{}"));
+      const context = JSON.parse(request.messages[1].content);
+      const output = context.chapterId
+        ? mockReport.chapters.find((chapter) => chapter.id === context.chapterId)
+        : { title: mockReport.title, directAnswer: mockReport.directAnswer, coreConclusions: mockReport.coreConclusions, finalSynthesis: mockReport.finalSynthesis, boundaries: mockReport.boundaries };
+      return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify(output) } }] });
+    }
     throw new Error(`Unexpected fetch in mock smoke test: ${String(input)}`);
   };
 }
