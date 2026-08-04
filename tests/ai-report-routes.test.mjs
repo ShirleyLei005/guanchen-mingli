@@ -40,6 +40,14 @@ async function getWorkerWithDeepSeekMock() {
     assert.match(String(input), /api\.deepseek\.com\/chat\/completions/);
     const request = JSON.parse(String(init?.body || "{}"));
     const context = JSON.parse(request.messages[1].content);
+    if (context.task === "chart_question") {
+      return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({
+        answer: `${paragraph}${paragraph}具体到现实行动，可以先记录触发情境、自己的第一反应和实际结果，再对照盘面证据做复盘。`,
+        evidenceRefs: [context.evidenceCatalog[0].id, context.evidenceCatalog[1].id],
+        actions: ["记录三次真实事件与反馈", "一个月后复盘选择是否更清晰"],
+        boundary: "命盘提示趋势，不替代现实判断。",
+      }) } }] });
+    }
     const full = mockReport(context.reportKind);
     let output = context.chapterId
       ? full.chapters.find((chapter) => chapter.id === context.chapterId)
@@ -96,4 +104,34 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
       assert.doesNotMatch(result.aiReport.directAnswer, /第一方|第二方/);
     }
   }
+});
+
+test("chart report dialogue answers from fixed evidence and charges three credits only on success", async () => {
+  const worker = await getWorkerWithDeepSeekMock();
+  const report = mockReport("bazi");
+  report.evidenceCatalog = [{ id: "B001", text: "四柱测试依据" }, { id: "B003", text: "五行结构测试依据" }];
+  const response = await call(worker, "/api/charts/chat", {
+    kind: "bazi",
+    question: "未来一年事业上应该优先准备什么？",
+    report,
+    history: [],
+  });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.creditCost, 3);
+  assert.equal(result.remainingCredits, 2);
+  assert.ok(result.answer.length >= 180);
+  assert.deepEqual(result.evidenceRefs, ["B001", "B003"]);
+  assert.match(response.headers.get("set-cookie") || "", /guanchen_test_credits=2/);
+
+  const insufficient = await worker.fetch(
+    new Request("http://localhost/api/charts/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: "guanchen_test_credits=2" },
+      body: JSON.stringify({ kind: "bazi", question: "继续追问", report, history: [] }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(insufficient.status, 402);
 });

@@ -34,7 +34,7 @@ const configs = {
     title: "命盘问答",
     eyebrow: "固定命盘 · 连续追问 · 现实选择",
     intro: "建立固定命盘后，围绕工作、感情、关系与时间节点继续提问，让每一轮讨论都回到现实行动。",
-    cost: 2,
+    cost: 3,
     topics: ["近期选择", "事业追问", "感情追问", "关系决策", "时间节点", "行动复盘"],
   },
 } as const;
@@ -631,8 +631,60 @@ function ZiweiNarrativeReport({ result }: { result: ZiweiChartResult }) {
 
 function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi" | "ziwei" | "compatibility" }) {
   const [activeId, setActiveId] = useState(report.chapters[0]?.id || "overview");
+  const [chatQuestion, setChatQuestion] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatNotice, setChatNotice] = useState("");
+  const [chatCredits, setChatCredits] = useState(5);
+  const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string; actions?: string[] }>>([]);
+  const chatActive = activeId === "ai_chat";
   const active = report.chapters.find((chapter) => chapter.id === activeId) ?? report.chapters[0];
   const evidenceMap = new Map(report.evidenceCatalog.map((item) => [item.id, item.text]));
+
+  useEffect(() => {
+    void fetch("/api/charts/chat")
+      .then((response) => response.json())
+      .then((data: { credits?: number }) => {
+        if (Number.isFinite(data.credits) && Number(data.credits) >= 0) setChatCredits(Number(data.credits));
+      })
+      .catch(() => undefined);
+  }, []);
+
+  async function askChartQuestion() {
+    const question = chatQuestion.trim();
+    if (!question || chatLoading) return;
+    if (chatCredits < 3) {
+      setChatNotice("当前积分不足，本次提问需要 3 积分。");
+      return;
+    }
+    setChatLoading(true);
+    setChatNotice("");
+    try {
+      const response = await fetch("/api/charts/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind,
+          question,
+          report: {
+            title: report.title,
+            directAnswer: report.directAnswer,
+            coreConclusions: report.coreConclusions,
+            evidenceCatalog: report.evidenceCatalog,
+          },
+          history: chatMessages.slice(-4).map(({ role, text }) => ({ role, text })),
+        }),
+      });
+      const data = await response.json() as { answer?: string; actions?: string[]; message?: string; creditCost?: number; remainingCredits?: number };
+      if (!response.ok || !data.answer) throw new Error(data.message || "AI 暂时无法回答，请稍后重试。");
+      setChatCredits(Number.isFinite(data.remainingCredits) ? Number(data.remainingCredits) : Math.max(0, chatCredits - (data.creditCost || 3)));
+      setChatMessages((current) => [...current, { role: "user", text: question }, { role: "assistant", text: data.answer!, actions: data.actions }]);
+      setChatQuestion("");
+    } catch (error) {
+      setChatNotice(error instanceof Error ? `${error.message} 本次未扣积分。` : "提问失败，本次未扣积分。");
+    } finally {
+      setChatLoading(false);
+    }
+  }
   if (!active) return null;
 
   return (
@@ -663,15 +715,33 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
         {report.chapters.map((chapter) => (
           <button type="button" key={chapter.id} className={chapter.id === active.id ? "active" : ""} onClick={() => setActiveId(chapter.id)}>{chapter.title}</button>
         ))}
+        <button type="button" className={chatActive ? "active ai-chat-tab" : "ai-chat-tab"} onClick={() => setActiveId("ai_chat")}>AI 对话</button>
       </nav>
 
-      <article className="ai-report-chapter">
+      {chatActive ? (
+        <section className="chart-chat-panel">
+          <header><small>基于当前命盘继续追问</small><h3>关于这张盘，你还想了解什么？</h3><p>AI 会结合本次排盘依据和前文结论回答。每次成功回答消耗 3 积分，失败不扣积分。</p></header>
+          <div className="chart-chat-balance"><span>当前余额</span><b>{chatCredits} 积分</b></div>
+          <div className="chart-chat-messages" aria-live="polite">
+            {chatMessages.length === 0 ? (
+              <div className="chart-chat-empty"><b>可以这样问</b><button type="button" onClick={() => setChatQuestion("未来两年事业上最值得提前准备什么？")}>未来两年事业上最值得提前准备什么？</button><button type="button" onClick={() => setChatQuestion("这张盘在亲密关系中最需要觉察的模式是什么？")}>亲密关系中最需要觉察什么？</button></div>
+            ) : chatMessages.map((message, index) => (
+              <article key={`${message.role}-${index}`} className={message.role}><small>{message.role === "user" ? "你的问题" : "观辰 AI"}</small><p>{message.text}</p>{message.actions?.length ? <ul>{message.actions.map((action) => <li key={action}>{action}</li>)}</ul> : null}</article>
+            ))}
+          </div>
+          <div className="chart-chat-compose">
+            <textarea value={chatQuestion} onChange={(event) => setChatQuestion(event.target.value)} maxLength={500} placeholder="写下你的具体问题，背景越清楚，回答越有针对性。" />
+            <button type="button" disabled={chatLoading || !chatQuestion.trim()} onClick={() => void askChartQuestion()}>{chatLoading ? "正在结合命盘分析…" : "发送问题 · 3 积分"}</button>
+          </div>
+          {chatNotice && <p className="chart-chat-notice">{chatNotice}</p>}
+        </section>
+      ) : <article className="ai-report-chapter">
         <header><small>专题解读</small><h3>{active.title}</h3><h4>{active.headline}</h4></header>
         <div className="ai-narrative">{active.narrative.map((paragraph, index) => <p key={`${active.id}-n-${index}`}>{paragraph}</p>)}</div>
 
         <section className="ai-expression-grid">
-          <article><small>顺势发挥时</small><p>{active.constructiveExpression}</p></article>
-          <article><small>容易卡住时</small><p>{active.pressureExpression}</p></article>
+          <article><small>更容易发挥的方式</small><p>{active.constructiveExpression}</p></article>
+          <article><small>需要主动调整的地方</small><p>{active.pressureExpression}</p></article>
         </section>
 
         <section className="ai-evidence-section">
@@ -693,7 +763,7 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
           <section><small>用现实验证</small>{active.reflectionQuestions.map((item, index) => <p key={`${active.id}-q-${index}`}>{item}</p>)}</section>
           <section><small>可以马上做</small>{active.actions.map((item, index) => <article key={`${item.horizon}-${index}`}><span>{item.horizon}</span><b>{item.title}</b><p>{item.detail}</p></article>)}</section>
         </div>
-      </article>
+      </article>}
 
       <footer className="ai-report-footer">
         <section><small>综合收束</small>{report.finalSynthesis.map((item, index) => <p key={`s-${index}`}>{item}</p>)}</section>

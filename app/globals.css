@@ -660,6 +660,29 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .ai-report-tabs { display: flex; padding: 0 38px; overflow-x: auto; border-bottom: 1px solid #dcd0bc; background: #f1e8d9; scrollbar-width: none; }
 .ai-report-tabs button { flex: 0 0 auto; padding: 20px 22px; color: #707872; background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; font-size: 15px; }
 .ai-report-tabs button.active { color: #173d32; border-bottom-color: #b88b4b; font-weight: 700; }
+.ai-report-tabs .ai-chat-tab { margin-left: auto; color: #8f6330; }
+.chart-chat-panel { padding: 58px; background: #fbf6ed; }
+.chart-chat-panel > header { max-width: 900px; }
+.chart-chat-panel > header small { color: #a87536; font: 700 12px/1.5 system-ui,sans-serif; letter-spacing: .06em; }
+.chart-chat-panel > header h3 { margin: 16px 0 10px; color: #173d32; font-size: clamp(30px,3.5vw,46px); font-weight: 400; }
+.chart-chat-panel > header p { margin: 0; color: #68736d; font: 15px/1.9 system-ui,sans-serif; }
+.chart-chat-balance { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; padding: 15px 18px; color: #665d50; background: #eee5d5; font: 13px/1.5 system-ui,sans-serif; }
+.chart-chat-balance b { color: #8f6330; font-size: 15px; }
+.chart-chat-messages { display: grid; gap: 14px; min-height: 210px; margin-top: 18px; padding: 24px; border: 1px solid #ded2be; background: #fffaf2; }
+.chart-chat-messages > article { max-width: 85%; padding: 20px 23px; border: 1px solid #ddd0bb; background: #f2eadc; }
+.chart-chat-messages > article.user { justify-self: end; background: #21493d; border-color: #21493d; color: #fff; }
+.chart-chat-messages article small { color: #a87536; font: 700 11px/1.5 system-ui,sans-serif; }
+.chart-chat-messages article.user small { color: #dfbd7c; }
+.chart-chat-messages article p { margin: 10px 0 0; font: 16px/2 system-ui,sans-serif; white-space: pre-wrap; }
+.chart-chat-messages article ul { margin: 14px 0 0; padding-left: 20px; font: 14px/1.9 system-ui,sans-serif; }
+.chart-chat-empty { display: flex; flex-wrap: wrap; align-content: center; gap: 10px; }
+.chart-chat-empty b { flex-basis: 100%; color: #24493d; font-size: 17px; }
+.chart-chat-empty button { padding: 12px 16px; color: #6d6253; background: #f5ede0; border: 1px solid #d9cbb5; cursor: pointer; }
+.chart-chat-compose { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; margin-top: 16px; }
+.chart-chat-compose textarea { min-height: 110px; padding: 17px; resize: vertical; color: #263b34; background: #fff; border: 1px solid #d6c9b4; font: 16px/1.8 system-ui,sans-serif; }
+.chart-chat-compose button { min-width: 190px; padding: 0 24px; color: #fff; background: #21493d; border: 0; cursor: pointer; font-weight: 700; }
+.chart-chat-compose button:disabled { cursor: wait; opacity: .55; }
+.chart-chat-notice { margin: 14px 0 0; color: #9a4d3f; font: 13px/1.7 system-ui,sans-serif; }
 .ai-report-chapter { padding: 62px 58px; }
 .ai-report-chapter > header h3 { margin: 16px 0 4px; font-size: clamp(32px,3.5vw,46px); line-height: 1.35; font-weight: 400; }
 .ai-report-chapter > header h4 { max-width: 1000px; margin: 14px 0 34px; color: #8f6330; font-size: 21px; line-height: 1.7; font-weight: 500; }
@@ -888,10 +911,14 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
   .reading-analysis h4, .reading-analysis article > p, .reading-analysis article > div, .reading-analysis article > .reading-explanation { grid-column: 1; grid-row: auto; }
   .reading-timing > header { align-items: flex-start; flex-direction: column; }
   .reading-timing > div, .reading-decisions { grid-template-columns: 1fr; }
-  .ai-report-cover, .ai-direct-answer, .ai-core-conclusions, .ai-report-chapter, .ai-report-footer { padding: 34px 22px; }
+  .ai-report-cover, .ai-direct-answer, .ai-core-conclusions, .ai-report-chapter, .ai-report-footer, .chart-chat-panel { padding: 34px 22px; }
   .measurement-wait-head { flex-direction: column; gap: 6px; }
   .ai-core-conclusions > div, .ai-expression-grid, .ai-evidence-facts, .ai-timing-section > div, .ai-reflection-actions { grid-template-columns: 1fr; }
   .ai-report-tabs { padding: 0 8px; }
+  .ai-report-tabs .ai-chat-tab { margin-left: 0; }
+  .chart-chat-compose { grid-template-columns: 1fr; }
+  .chart-chat-compose button { min-height: 54px; }
+  .chart-chat-messages > article { max-width: 100%; }
   .reading-timing h4 { min-height: 0; }
   .report-output { padding: 22px 16px; }
 }
