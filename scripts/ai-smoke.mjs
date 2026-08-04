@@ -1,6 +1,6 @@
 if (process.env.AI_SMOKE_MOCK === "1") {
-  process.env.AI_REPORT_PROVIDER = "siliconflow";
-  process.env.SILICONFLOW_API_KEY = "mock-key-used-only-for-local-structure-test";
+  process.env.AI_REPORT_PROVIDER = "deepseek";
+  process.env.DEEPSEEK_API_KEY = "mock-key-used-only-for-local-structure-test";
   const paragraph = "命盘提供的是一种观察结构：先核对盘面中的动力如何相互支持，再把它放回当事人的经历、资源和现实选择中理解。优势与压力往往来自同一倾向，建设性表达需要清晰边界、持续练习和可复盘的行动；任何阶段提示都不能代替真实反馈与专业判断。";
   const chapter = (id, title, refs) => ({
     id, title, headline: `${title}：从盘面趋势回到现实选择`,
@@ -32,15 +32,8 @@ if (process.env.AI_SMOKE_MOCK === "1") {
     finalSynthesis: ["把盘面当作问题地图。", "用现实反馈校正判断。", "最终决定权始终在自己手中。"],
     boundaries: ["传统文化娱乐与自我反思参考。", "不替代医疗、投资或法律意见。", "不以单一星曜或流年决定人生。"],
   };
-  globalThis.fetch = async (input, init) => {
-    if (String(input).includes("api.siliconflow.cn/v1/chat/completions")) {
-      const request = JSON.parse(String(init?.body || "{}"));
-      const context = JSON.parse(request.messages[1].content);
-      const output = context.chapterId
-        ? mockReport.chapters.find((chapter) => chapter.id === context.chapterId)
-        : (({ chapters: _chapters, ...summary }) => summary)(mockReport);
-      return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify(output) } }] });
-    }
+  globalThis.fetch = async (input) => {
+    if (String(input).includes("api.deepseek.com/chat/completions")) return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify(mockReport) } }] });
     throw new Error(`Unexpected fetch in mock smoke test: ${String(input)}`);
   };
 }

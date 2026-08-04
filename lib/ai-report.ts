@@ -25,7 +25,7 @@ export type AiReportChapter = {
 export type AiDeepReport = {
   status: "generated";
   reportId: string;
-  provider: "siliconflow" | "groq" | "openai";
+  provider: "deepseek" | "siliconflow" | "groq" | "openai";
   model: string;
   promptVersion: string;
   title: string;
@@ -183,7 +183,7 @@ function systemInstructions(kind: ReportKind) {
   return `你是观辰的资深传统命理报告编辑。${method}
 你的工作是解释服务端已经计算好的命盘，不是重新排盘。只能使用证据目录里的事实；严禁自行补算、改写或发明星曜、宫位、干支、十神、四化、运限。
 写成专业咨询式的简体中文长报告：先直接回应用户最关心的问题，再解释盘面结构、正向表达、压力表达、阶段变化与现实行动。每项核心结论和时间判断必须引用 evidenceRefs；引用只能是目录中存在的编号。
-${chapterRule}每章 narrative 至少三段，每段应有实质内容，避免重复套话。时间判断只能使用目录明确提供的大运或流年；合盘不得把双方阶段不同步写成分手或结婚预言。
+${chapterRule}每章 narrative 正好三段，每段80至140个汉字，应有实质内容且避免重复套话；每章 timing 最多三项、actions 两至三项。时间判断只能使用目录明确提供的大运或流年；合盘不得把双方阶段不同步写成分手或结婚预言。
 命盘揭示趋势与人生课题，不决定人生。禁止确定性婚期、离婚、疾病、寿命、灾祸、投资收益或法律结果；健康、投资、法律事项只给一般性提醒并建议咨询专业人士。不要伪造古籍引文，不要宣称准确率。`;
 }
 
@@ -229,7 +229,15 @@ function validateReport(report: GeneratedReport, catalog: EvidenceItem[], kind: 
   for (const id of REQUIRED_CHAPTERS[kind]) if (!report.chapters.some((chapter) => chapter.id === id)) errors.push(`缺少章节：${id}`);
   if (report.directAnswer.trim().length < 100) errors.push("直接回答过短");
   report.chapters.forEach((chapter) => {
-    if (chapter.narrative.join("").length < 260) errors.push(`${chapter.id}章节内容过短`);
+    const chapterContent = [
+      ...chapter.narrative,
+      ...chapter.evidenceExplanation,
+      chapter.constructiveExpression,
+      chapter.pressureExpression,
+      ...chapter.timing.flatMap((item) => [item.theme, item.opportunity, item.caution]),
+      ...chapter.actions.flatMap((item) => [item.title, item.detail]),
+    ].join("");
+    if (chapterContent.length < 500) errors.push(`${chapter.id}章节内容过短`);
   });
   if (BANNED_CERTAINTY.test(JSON.stringify(report))) errors.push("出现禁止的确定性断言");
   return errors;
@@ -242,11 +250,79 @@ async function requestStructuredReport(args: {
   catalog: EvidenceItem[];
   correction?: string;
 }) {
-  const provider = (process.env.AI_REPORT_PROVIDER || "siliconflow").toLowerCase();
+  const provider = (process.env.AI_REPORT_PROVIDER || "deepseek").toLowerCase();
   if (provider === "openai") return requestOpenAiReport(args);
+  if (provider === "deepseek") return requestDeepSeekReport(args);
   if (provider === "siliconflow") return requestSiliconFlowReport(args);
   if (provider === "groq") return requestGroqReport(args);
   throw new AiReportError("AI_PROVIDER_INVALID", `不支持的 AI 报告服务：${provider}`);
+}
+
+async function requestDeepSeekReport(args: {
+  kind: ReportKind;
+  question: string;
+  topics: string[];
+  catalog: EvidenceItem[];
+  correction?: string;
+}) {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) throw new AiReportError("AI_NOT_CONFIGURED", "DeepSeek 深度报告服务尚未配置，请管理员设置 DEEPSEEK_API_KEY");
+  const model = process.env.DEEPSEEK_REPORT_MODEL || "deepseek-v4-flash";
+  let response: Response;
+  try {
+    response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(120_000),
+      body: JSON.stringify({
+        model,
+        stream: false,
+        thinking: { type: "disabled" },
+        temperature: 0.45,
+        max_tokens: 8_000,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: `${systemInstructions(args.kind)}\n只返回一个合法 JSON 对象，不要输出 Markdown、代码围栏或额外说明。必须完整输出全部章节，JSON 字段严格遵循用户消息中的 outputSchema。`,
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              reportKind: args.kind,
+              question: args.question,
+              selectedTopics: args.topics,
+              evidenceCatalog: args.catalog,
+              correction: args.correction || "",
+              outputSchema: reportSchema,
+            }),
+          },
+        ],
+      }),
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      throw new AiReportError("AI_TIMEOUT", "DeepSeek 生成超时，本次请求已停止，请稍后重试");
+    }
+    throw new AiReportError("DEEPSEEK_REQUEST_FAILED", "无法连接 DeepSeek 服务，请稍后重试");
+  }
+  const payload = await response.json().catch(() => null) as { error?: { message?: string; code?: string } } | null;
+  if (!response.ok) {
+    const providerMessage = payload?.error?.message || "";
+    if (response.status === 401 || /invalid.*key|authentication|unauthorized/i.test(providerMessage)) {
+      throw new AiReportError("AI_AUTHENTICATION_FAILED", "DeepSeek 服务认证失败，请检查 DEEPSEEK_API_KEY");
+    }
+    if (response.status === 402 || /balance|余额|insufficient/i.test(providerMessage)) {
+      throw new AiReportError("AI_QUOTA_EXHAUSTED", "DeepSeek API 余额不足，请检查账户余额");
+    }
+    if (response.status === 429) throw new AiReportError("AI_RATE_LIMITED", "DeepSeek 请求较多，请稍后重试");
+    if (response.status === 413 || /token|context|too large/i.test(providerMessage)) {
+      throw new AiReportError("AI_TOKEN_LIMIT", "本次盘面资料超过 DeepSeek 上下文限制，请减少分析方向后重试");
+    }
+    throw new AiReportError("DEEPSEEK_REQUEST_FAILED", providerMessage || `DeepSeek 请求失败（${response.status}）`);
+  }
+  const parsed = parseReportJson(extractGroqOutputText(payload));
+  return { parsed, model, provider: "deepseek" as const };
 }
 
 async function requestSiliconFlowReport(args: {
