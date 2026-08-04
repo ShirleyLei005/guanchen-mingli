@@ -90,6 +90,10 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
       setNotice("请先从地点候选列表中确认出生地，并等待真太阳时校正完成。");
       return;
     }
+    if (!primaryBirth.name || (kind === "match" && !secondaryBirth?.name)) {
+      setNotice(kind === "match" ? "请填写双方姓名或常用称呼。" : "请填写姓名或常用称呼。");
+      return;
+    }
     if (kind !== "match" && !selected.length) {
       setNotice("请至少选择一个分析方向。");
       return;
@@ -110,6 +114,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            name: primaryBirth.name,
             trueSolarTime: primaryBirth.solarTime.trueSolarTime,
             gender: primaryBirth.gender,
             topics: reportTopics,
@@ -134,8 +139,8 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             mode: matchMode,
-            first: { trueSolarTime: primaryBirth.solarTime.trueSolarTime, gender: primaryBirth.gender },
-            second: { trueSolarTime: secondaryBirth.solarTime.trueSolarTime, gender: secondaryBirth.gender },
+            first: { name: primaryBirth.name, trueSolarTime: primaryBirth.solarTime.trueSolarTime, gender: primaryBirth.gender },
+            second: { name: secondaryBirth.name, trueSolarTime: secondaryBirth.solarTime.trueSolarTime, gender: secondaryBirth.gender },
             topics: reportTopics,
             notes,
             deepReport: true,
@@ -246,7 +251,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
       {submitted && primaryBirth && (
         <section className="measure-result" id="measurement-result">
           <div>
-            <p>CHART &amp; REPORT</p><h2>{chartResult ? "排盘与解读报告" : "出生坐标与排盘时间已确认"}</h2>
+            <p>CHART &amp; REPORT</p><h2>{chartResult ? `${primaryBirth.name}${kind === "match" && secondaryBirth ? `与${secondaryBirth.name}` : ""}的排盘与解读报告` : "出生坐标与排盘时间已确认"}</h2>
             <span>{chartResult ? "以下盘面由固定版本服务端引擎计算；每项解读都标明盘面依据。" : "已完成输入核对，后续产品将继续绑定同一命盘版本。"}</span>
           </div>
           <div className="verified-grid">

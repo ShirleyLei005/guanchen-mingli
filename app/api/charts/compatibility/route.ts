@@ -3,6 +3,7 @@ import { generateCompatibility, type CompatibilityMode } from "../../../../lib/c
 import { AiReportError, generateDeepReport } from "../../../../lib/ai-report";
 
 type BirthPayload = {
+  name?: string;
   trueSolarTime?: string;
   gender?: "female" | "male";
 };
@@ -24,23 +25,29 @@ export async function POST(request: Request) {
     const result = await generateCompatibility({
       mode,
       first: {
+        name: body.first.name?.trim().slice(0, 30),
         trueSolarTime: body.first.trueSolarTime,
         gender: body.first.gender === "male" ? "male" : "female",
         topics: body.topics ?? [],
       },
       second: {
+        name: body.second.name?.trim().slice(0, 30),
         trueSolarTime: body.second.trueSolarTime,
         gender: body.second.gender === "male" ? "male" : "female",
         topics: body.topics ?? [],
       },
       topics: body.topics ?? [],
     });
-    if (body.deepReport) result.aiReport = await generateDeepReport({
-      kind: "compatibility",
-      chart: result,
-      topics: (body.topics ?? []).slice(0, 3),
-      question: body.notes?.slice(0, 500),
-    });
+    if (body.deepReport) {
+      const firstName = result.profiles[0]?.label || "第一方";
+      const secondName = result.profiles[1]?.label || "第二方";
+      result.aiReport = relabelReport(await generateDeepReport({
+        kind: "compatibility",
+        chart: result,
+        topics: body.topics ?? [],
+        question: [`分析对象：${firstName}与${secondName}。`, body.notes?.slice(0, 500)].filter(Boolean).join(" "),
+      }), firstName, secondName);
+    }
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(
@@ -52,4 +59,13 @@ export async function POST(request: Request) {
       { status: error instanceof AiReportError ? 502 : 500 },
     );
   }
+}
+
+function relabelReport<T>(value: T, firstName: string, secondName: string): T {
+  if (typeof value === "string") return value.replaceAll("第一方", firstName).replaceAll("第二方", secondName) as T;
+  if (Array.isArray(value)) return value.map((item) => relabelReport(item, firstName, secondName)) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, relabelReport(item, firstName, secondName)])) as T;
+  }
+  return value;
 }

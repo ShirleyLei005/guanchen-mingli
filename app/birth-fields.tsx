@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { PlaceMatch, SolarTimeResult } from "../lib/solar-time";
 
 export type ResolvedBirth = {
+  name: string;
   gender: "female" | "male";
   calendar: "solar" | "lunar";
   isLeapMonth: boolean;
@@ -26,6 +27,7 @@ export function BirthFields({
   onChange: (value: ResolvedBirth | null) => void;
 }) {
   const [gender, setGender] = useState<"female" | "male">("female");
+  const [personName, setPersonName] = useState("");
   const [calendar, setCalendar] = useState<"solar" | "lunar">("solar");
   const [isLeapMonth, setIsLeapMonth] = useState(false);
   const [dateTime, setDateTime] = useState("1992-08-18T08:30");
@@ -76,14 +78,21 @@ export function BirthFields({
         if (!response.ok) throw new Error("SOLAR_TIME_FAILED");
         const result = await response.json() as SolarTimeResult;
         setSolar(result);
-        onChange({ gender, calendar, isLeapMonth, dateTime, place: place!, solarTime: result });
       } catch (error) {
-        if ((error as Error).name !== "AbortError") onChange(null);
+        if ((error as Error).name !== "AbortError") {
+          setSolar(null);
+          onChange(null);
+        }
       }
     }
     void run();
     return () => controller.abort();
-  }, [calendar, dateTime, gender, isLeapMonth, onChange, place]);
+  }, [calendar, dateTime, isLeapMonth, onChange, place]);
+
+  useEffect(() => {
+    if (!place || !solar) return;
+    onChange({ name: personName.trim(), gender, calendar, isLeapMonth, dateTime, place, solarTime: solar });
+  }, [calendar, dateTime, gender, isLeapMonth, onChange, personName, place, solar]);
 
   function resetResolved() {
     setSolar(null);
@@ -93,6 +102,17 @@ export function BirthFields({
   return (
     <fieldset className="birth-fieldset">
       {label && <legend>{label}</legend>}
+      <label>姓名
+        <input
+          type="text"
+          value={personName}
+          onChange={(event) => setPersonName(event.target.value.slice(0, 30))}
+          placeholder="请输入姓名或常用称呼"
+          autoComplete="name"
+          maxLength={30}
+        />
+        <small>合盘报告会使用这个名字展示双方信息。</small>
+      </label>
       <div className="measure-row">
         <label>性别
           <span className="measure-segmented">

@@ -55,6 +55,13 @@ test("Bazi and Ziwei forms expose the requested start button", async () => {
   }
 });
 
+test("birth forms collect a name for personalized reports", async () => {
+  const source = await readFile(new URL("../app/birth-fields.tsx", import.meta.url), "utf8");
+  assert.match(source, /<label>姓名/);
+  assert.match(source, /请输入姓名或常用称呼/);
+  assert.match(source, /name: personName\.trim\(\)/);
+});
+
 test("measurement UX includes a visible wait state and full compatibility scope", async () => {
   const source = await readFile(new URL("../app/measurement-page.tsx", import.meta.url), "utf8");
   assert.match(source, /预计还需/);
@@ -295,8 +302,8 @@ test("compatibility defaults to Bazi and also supports Ziwei without a fake scor
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           mode,
-          first: { trueSolarTime: "1990-01-01T08:30:00", gender: "male" },
-          second: { trueSolarTime: "1995-01-05T19:50:00", gender: "female" },
+          first: { name: "子安", trueSolarTime: "1990-01-01T08:30:00", gender: "male" },
+          second: { name: "清和", trueSolarTime: "1995-01-05T19:50:00", gender: "female" },
           topics: ["关系总览"],
         }),
       }),
@@ -307,6 +314,9 @@ test("compatibility defaults to Bazi and also supports Ziwei without a fake scor
     const result = await response.json();
     assert.equal(result.mode, mode);
     assert.equal(result.profiles.length, 2);
+    assert.deepEqual(result.profiles.map((profile) => profile.label), ["子安", "清和"]);
+    assert.match(result.evidenceCatalog[0].text, /子安/);
+    assert.ok(result.evidenceCatalog.some((item) => item.text.includes("清和")));
     assert.equal("score" in result, false);
     assert.ok(result.report.topics.length >= 4);
   }

@@ -11,7 +11,7 @@ function mockReport(kind) {
     : [["overview", "命格总览"], ["personality", "性格特质"], ["career", "事业发展"], ["wealth", "财富资源"], ["relationships", "关系情感"], ["timing", "阶段节奏"]];
   return {
     title: kind === "compatibility" ? "看见彼此的互动方式，也保留共同选择" : "在趋势中辨认课题，在选择中塑造人生",
-    directAnswer: paragraph,
+    directAnswer: kind === "compatibility" ? `第一方与第二方需要把盘面倾向放回真实互动中验证。${paragraph}` : paragraph,
     coreConclusions: [
       { title: "结构主轴", conclusion: paragraph, evidenceRefs: refs },
       { title: "现实表达", conclusion: paragraph, evidenceRefs: refs },
@@ -60,7 +60,7 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
   const cases = [
     ["/api/charts/bazi", { trueSolarTime: "2000-01-01T12:00:00", gender: "male", topics: ["综合看看"], notes: "虚构测试样本", deepReport: true }],
     ["/api/charts/ziwei", { trueSolarTime: "2000-01-01T12:00:00", gender: "male", topics: ["命盘总览"], notes: "虚构测试样本", deepReport: true }],
-    ["/api/charts/compatibility", { mode: "bazi", first: { trueSolarTime: "2000-01-01T12:00:00", gender: "male" }, second: { trueSolarTime: "2001-02-02T13:00:00", gender: "female" }, topics: ["关系总览"], notes: "虚构双盘测试样本", deepReport: true }],
+    ["/api/charts/compatibility", { mode: "bazi", first: { name: "子安", trueSolarTime: "2000-01-01T12:00:00", gender: "male" }, second: { name: "清和", trueSolarTime: "2001-02-02T13:00:00", gender: "female" }, topics: ["关系总览"], notes: "虚构双盘测试样本", deepReport: true }],
   ];
   for (const [path, body] of cases) {
     const response = await call(worker, path, body);
@@ -72,5 +72,9 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
     const valid = new Set(result.aiReport.evidenceCatalog.map((item) => item.id));
     const cited = result.aiReport.chapters.flatMap((chapter) => [...chapter.evidenceRefs, ...chapter.timing.flatMap((item) => item.evidenceRefs)]);
     assert.equal(cited.every((id) => valid.has(id)), true);
+    if (path.includes("compatibility")) {
+      assert.match(result.aiReport.directAnswer, /子安与清和/);
+      assert.doesNotMatch(result.aiReport.directAnswer, /第一方|第二方/);
+    }
   }
 });
