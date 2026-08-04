@@ -49,7 +49,7 @@ export class AiReportError extends Error {
   }
 }
 
-const PROMPT_VERSION = "deep-report-2026-08-04-v6";
+const PROMPT_VERSION = "deep-report-2026-08-04-v7";
 const REQUIRED_CHAPTERS: Record<ReportKind, string[]> = {
   bazi: ["overview", "career_wealth", "relationships", "health", "children", "family", "timing"],
   ziwei: ["overview", "career_wealth", "relationships", "health", "children", "family", "timing"],
@@ -93,10 +93,53 @@ function normalizeNarrative(narrative: string[]) {
   return paragraphs;
 }
 
-function normalizeGeneratedReport(report: GeneratedReport) {
+function parseEvidenceYear(text: string) {
+  const match = text.match(/(20\d{2})年/);
+  return match ? Number(match[1]) : null;
+}
+
+function buildTimelineFallback(item: EvidenceItem, isDecade: boolean): AiReportChapter["timing"][number] {
+  const year = parseEvidenceYear(item.text);
+  const period = isDecade
+    ? item.text.match(/大运([^：]+)/)?.[1]?.trim() || "当前大运"
+    : year ? `${year} 流年` : "流年阶段";
+  return {
+    period,
+    theme: item.text,
+    evidenceRefs: [item.id],
+    opportunity: "结合本章主题提前安排资源、沟通与行动节奏，并用现实反馈持续校正。",
+    caution: "流年只提示议题被激活的时间窗口，不据此承诺具体事件或结果。",
+  };
+}
+
+function normalizePersonalTimeline(chapter: AiReportChapter, catalog: EvidenceItem[], kind: ReportKind) {
+  if (kind === "compatibility") return;
+  const currentYear = new Date().getFullYear();
+  const decadeCandidates = catalog.filter((item) => kind === "bazi" ? /^B05\d$/.test(item.id) : item.id === "Z004");
+  const decade = decadeCandidates.find((item) => {
+    const range = item.text.match(/(20\d{2})[—–-](20\d{2})/);
+    return range && currentYear >= Number(range[1]) && currentYear <= Number(range[2]);
+  }) ?? decadeCandidates[0];
+  const annualCandidates = catalog
+    .filter((item) => kind === "bazi" ? /^B07\d$/.test(item.id) : /^Z03\d$/.test(item.id))
+    .map((item) => ({ item, year: parseEvidenceYear(item.text) }))
+    .filter((entry): entry is { item: EvidenceItem; year: number } => entry.year !== null)
+    .sort((left, right) => left.year - right.year);
+  const futureYears = annualCandidates.filter((entry) => entry.year >= currentYear).slice(0, 3);
+  const selectedYears = futureYears.length >= 3 ? futureYears : annualCandidates.slice(-3);
+  const slots = [decade, ...selectedYears.map((entry) => entry.item)].filter((item): item is EvidenceItem => Boolean(item));
+  chapter.timing = slots.map((item, index) => {
+    const generated = chapter.timing.find((entry) => entry.evidenceRefs.includes(item.id));
+    const fallback = buildTimelineFallback(item, index === 0);
+    return generated ? { ...generated, period: fallback.period } : fallback;
+  });
+}
+
+function normalizeGeneratedReport(report: GeneratedReport, catalog: EvidenceItem[], kind: ReportKind) {
   if (!report || !Array.isArray(report.chapters)) return report;
   report.chapters.forEach((chapter) => {
     if (Array.isArray(chapter?.narrative)) chapter.narrative = normalizeNarrative(chapter.narrative);
+    if (Array.isArray(chapter?.timing)) normalizePersonalTimeline(chapter, catalog, kind);
   });
   return report;
 }
@@ -227,7 +270,7 @@ function systemInstructions(kind: ReportKind) {
   return `你是观辰的资深传统命理报告编辑。${method}
 你的工作是解释服务端已经计算好的命盘，不是重新排盘。只能使用证据目录里的事实；严禁自行补算、改写或发明星曜、宫位、干支、十神、四化、运限。
 写成专业但通俗的简体中文咨询报告，避免堆砌术语。必须使用命理术语时，紧接着用日常语言解释它对工作、关系、情绪或选择意味着什么。先直接回应用户最关心的问题，再解释盘面结构、正向表达、压力表达、阶段变化与现实行动。每项核心结论和时间判断必须引用 evidenceRefs；引用只能是目录中存在的编号。
-${chapterRule}每章 narrative 正好四段，每段90至160个汉字：第一段直接说明这组结构对当事人意味着什么；第二段结合至少两条盘面依据解释为什么；第三段给出二至三个容易在工作、关系、情绪或决策中被本人认出的具体表现，并同时写出顺境与压力下的差别；第四段说明如何在现实中验证、调整和运用。不要写“你很重感情、偶尔敏感”一类适用于多数人的空泛句子，不要重复套话。evidenceExplanation 必须用日常语言把多条盘面事实如何共同支持结论讲清楚，不能只复述证据。directAnswer 应先给清晰结论，再给关键依据和当前最值得留意的现实课题。每章 timing 最多三项、actions 两至三项，行动建议要具体到可执行步骤、观察信号和复盘方式。时间判断只能使用目录明确提供的大运或流年；合盘不得把双方阶段不同步写成分手或结婚预言。
+${chapterRule}每章 narrative 正好四段，每段90至160个汉字：第一段直接说明这组结构对当事人意味着什么；第二段结合至少两条盘面依据解释为什么；第三段给出二至三个容易在工作、关系、情绪或决策中被本人认出的具体表现，并同时写出顺境与压力下的差别；第四段说明如何在现实中验证、调整和运用。不要写“你很重感情、偶尔敏感”一类适用于多数人的空泛句子，不要重复套话。evidenceExplanation 必须用日常语言把多条盘面事实如何共同支持结论讲清楚，不能只复述证据。directAnswer 应先给清晰结论，再给关键依据和当前最值得留意的现实课题。个人命盘每章 timing 正好四项，依次为当前大运、当年流年及随后两个流年；合盘每章 timing 最多一项。actions 两至三项，行动建议要具体到可执行步骤、观察信号和复盘方式。时间判断只能使用目录明确提供的大运或流年；合盘不得把双方阶段不同步写成分手或结婚预言。
 命盘揭示趋势与人生课题，不决定人生。禁止确定性婚期、离婚、疾病、寿命、灾祸、投资收益或法律结果；健康、投资、法律事项只给一般性提醒并建议咨询专业人士。不要伪造古籍引文，不要宣称准确率。`;
 }
 
@@ -328,7 +371,7 @@ async function requestDeepSeekReport(args: {
     }),
     ...REQUIRED_CHAPTERS[args.kind].map((id) => () => callDeepSeekJson({
       apiKey, model, maxTokens: 3000,
-      system: `${systemInstructions(args.kind)}\n本次忽略整份 chapters 数组的格式要求，只生成“${chapterTitles[id]}”一个章节对象。id 必须为 ${id}；narrative 正好4段，每段90至150字，并包含具体生活场景；evidenceRefs 2至3项；evidenceExplanation 正好2至3项；timing 最多1项；reflectionQuestions 正好2项；actions 正好2项。只返回合法 JSON。`,
+      system: `${systemInstructions(args.kind)}\n本次忽略整份 chapters 数组的格式要求，只生成“${chapterTitles[id]}”一个章节对象。id 必须为 ${id}；narrative 正好4段，每段90至150字，并包含具体生活场景；evidenceRefs 2至3项；evidenceExplanation 正好2至3项；${args.kind === "compatibility" ? "timing 最多1项" : "timing 正好4项，依次分析当前大运、当年流年及随后两个流年，每项必须引用对应运限证据"}；reflectionQuestions 正好2项；actions 正好2项。只返回合法 JSON。`,
       user: { ...context, chapterId: id, chapterTitle: chapterTitles[id], requiredJsonShape: { id, title: chapterTitles[id], headline: "本章核心判断", narrative: ["含义", "依据", "具体表现", "验证与运用"], evidenceRefs: ["有效证据编号1", "有效证据编号2"], evidenceExplanation: ["推导说明1", "推导说明2"], constructiveExpression: "顺势发挥时", pressureExpression: "容易卡住时", timing: [{ period: "证据明确的阶段", theme: "主题", evidenceRefs: ["有效证据编号"], opportunity: "可把握", caution: "需留意" }], reflectionQuestions: ["问题1", "问题2"], actions: [{ horizon: "时间范围", title: "行动", detail: "步骤与观察信号" }, { horizon: "时间范围", title: "行动", detail: "步骤与复盘方式" }] } },
     })),
   ];
@@ -415,7 +458,7 @@ async function requestSiliconFlowReport(args: {
     }),
     ...REQUIRED_CHAPTERS[args.kind].map((id) => () => callSiliconFlowJson({
       apiKey, model, maxTokens: 3000,
-      system: `${systemInstructions(args.kind)}\n本次只生成“${chapterTitles[id]}”一个章节，id 必须严格为 ${id}。narrative 正好4段，每段90至150个汉字；evidenceRefs 正好2至3项且必须有效；evidenceExplanation 正好2项；timing 最多1项；reflectionQuestions 正好2项；actions 正好2项。正向表达、压力表达和行动建议均须具体。只返回合法 JSON。`,
+      system: `${systemInstructions(args.kind)}\n本次只生成“${chapterTitles[id]}”一个章节，id 必须严格为 ${id}。narrative 正好4段，每段90至150个汉字；evidenceRefs 正好2至3项且必须有效；evidenceExplanation 正好2项；${args.kind === "compatibility" ? "timing 最多1项" : "timing 正好4项，依次分析当前大运、当年流年及随后两个流年，每项引用对应证据"}；reflectionQuestions 正好2项；actions 正好2项。正向表达、压力表达和行动建议均须具体。只返回合法 JSON。`,
       user: {
         ...baseContext,
         chapterId: id,
@@ -654,14 +697,14 @@ export async function generateDeepReport(args: {
       : buildCompatibilityEvidence(args.chart as CompatibilityResult);
   const question = args.question?.trim() || `请围绕${args.topics.join("、") || "命盘总览"}进行完整分析。`;
   let result = await requestStructuredReport({ kind: args.kind, question, topics: args.topics, catalog });
-  normalizeGeneratedReport(result.parsed);
+  normalizeGeneratedReport(result.parsed, catalog, args.kind);
   result.parsed.chapters = REQUIRED_CHAPTERS[args.kind]
     .map((id) => result.parsed.chapters.find((chapter) => chapter.id === id))
     .filter((chapter): chapter is AiReportChapter => Boolean(chapter));
   let errors = validateReport(result.parsed, catalog, args.kind);
   if (errors.length) {
     result = await requestStructuredReport({ kind: args.kind, question, topics: args.topics, catalog, correction: `上一版未通过质量检查，请重写并修复：${errors.join("；")}` });
-    normalizeGeneratedReport(result.parsed);
+    normalizeGeneratedReport(result.parsed, catalog, args.kind);
     result.parsed.chapters = REQUIRED_CHAPTERS[args.kind]
       .map((id) => result.parsed.chapters.find((chapter) => chapter.id === id))
       .filter((chapter): chapter is AiReportChapter => Boolean(chapter));

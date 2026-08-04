@@ -682,7 +682,7 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .ai-evidence-facts.compact article:first-child { margin-top: 0; }
 .ai-evidence-facts.compact article small { display: none; }
 .ai-evidence-facts.compact article p { margin: 0 !important; font-size: 12px !important; }
-.ai-timing-section > div { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; margin-top: 22px; background: #d8cdbb; border: 1px solid #d8cdbb; }
+.ai-timing-section > div { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 1px; margin-top: 22px; background: #d8cdbb; border: 1px solid #d8cdbb; }
 .ai-timing-section article { padding: 26px; background: #fffaf2; }
 .ai-timing-section article > b { color: #173d32; font-size: 25px; font-weight: 400; }
 .ai-timing-section h4 { margin: 18px 0 14px; font-size: 18px; line-height: 1.7; }

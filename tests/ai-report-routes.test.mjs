@@ -84,6 +84,10 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
     assert.equal(result.aiReport.model, "deepseek-v4-flash");
     assert.equal(result.aiReport.chapters.length, path.includes("compatibility") ? 6 : 7);
     assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.length === 4), true);
+    if (!path.includes("compatibility")) {
+      assert.equal(result.aiReport.chapters.every((chapter) => chapter.timing.length === 4), true);
+      assert.equal(result.aiReport.chapters.every((chapter) => chapter.timing.slice(1).every((item) => /流年/.test(item.period))), true);
+    }
     const valid = new Set(result.aiReport.evidenceCatalog.map((item) => item.id));
     const cited = result.aiReport.chapters.flatMap((chapter) => [...chapter.evidenceRefs, ...chapter.timing.flatMap((item) => item.evidenceRefs)]);
     assert.equal(cited.every((id) => valid.has(id)), true);
