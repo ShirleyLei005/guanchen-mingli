@@ -43,13 +43,14 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
   const config = configs[kind];
   const [primaryBirth, setPrimaryBirth] = useState<ResolvedBirth | null>(null);
   const [secondaryBirth, setSecondaryBirth] = useState<ResolvedBirth | null>(null);
-  const [selected, setSelected] = useState<string[]>([config.topics[0]]);
+  const [selected, setSelected] = useState<string[]>(kind === "match" ? [...config.topics] : [config.topics[0]]);
   const [notes, setNotes] = useState("");
   const [consent, setConsent] = useState(true);
   const [notice, setNotice] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [matchMode, setMatchMode] = useState<CompatibilityMode>("bazi");
   const [chartResult, setChartResult] = useState<BaziChartResult | ZiweiChartResult | CompatibilityResult | null>(null);
 
@@ -62,6 +63,12 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
     ];
     return () => timers.forEach(window.clearTimeout);
   }, [loading, kind]);
+
+  useEffect(() => {
+    if (!loading) return;
+    const timer = window.setInterval(() => setElapsedSeconds((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [loading]);
 
   const updatePrimary = useCallback((value: ResolvedBirth | null) => setPrimaryBirth(value), []);
   const updateSecondary = useCallback((value: ResolvedBirth | null) => setSecondaryBirth(value), []);
@@ -83,7 +90,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
       setNotice("请先从地点候选列表中确认出生地，并等待真太阳时校正完成。");
       return;
     }
-    if (!selected.length) {
+    if (kind !== "match" && !selected.length) {
       setNotice("请至少选择一个分析方向。");
       return;
     }
@@ -94,7 +101,9 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
     setNotice("");
     setChartResult(null);
     setLoadingStage(0);
+    setElapsedSeconds(0);
     setLoading(true);
+    const reportTopics = kind === "match" ? [...configs.match.topics] : selected;
     try {
       if (kind === "bazi" || kind === "ziwei") {
         const response = await fetch(`/api/charts/${kind}`, {
@@ -103,7 +112,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
           body: JSON.stringify({
             trueSolarTime: primaryBirth.solarTime.trueSolarTime,
             gender: primaryBirth.gender,
-            topics: selected,
+            topics: reportTopics,
             notes,
             calendar: primaryBirth.calendar,
             timezone: primaryBirth.place.timezone || "Asia/Shanghai",
@@ -127,7 +136,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
             mode: matchMode,
             first: { trueSolarTime: primaryBirth.solarTime.trueSolarTime, gender: primaryBirth.gender },
             second: { trueSolarTime: secondaryBirth.solarTime.trueSolarTime, gender: secondaryBirth.gender },
-            topics: selected,
+            topics: reportTopics,
             notes,
             deepReport: true,
           }),
@@ -144,6 +153,10 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
       setLoading(false);
     }
   }
+
+  const estimatedSeconds = kind === "match" ? 70 : 75;
+  const remainingSeconds = Math.max(estimatedSeconds - elapsedSeconds, 0);
+  const loadingProgress = Math.min(96, Math.max(4, (elapsedSeconds / estimatedSeconds) * 100));
 
   return (
     <main className="inner-page">
@@ -179,16 +192,24 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
         <BirthFields label={kind === "match" ? "第一方资料" : undefined} onChange={updatePrimary} />
         {kind === "match" && <BirthFields label="第二方资料" defaultPlace="成都" onChange={updateSecondary} />}
 
-        <fieldset className="birth-fieldset topic-fieldset">
-          <legend>本次重点方向</legend>
-          <p>最多选择 3 项，完整报告会围绕所选课题组织。</p>
-          <div className="measure-topics">
-            {config.topics.map((topic) => (
-              <button type="button" key={topic} className={selected.includes(topic) ? "selected" : ""} onClick={() => toggleTopic(topic)}>{topic}</button>
-            ))}
-          </div>
-          <div className="topic-status"><span>已选 {selected.length}/3</span><button type="button" onClick={() => setSelected([])}>清空</button></div>
-        </fieldset>
+        {kind === "match" ? (
+          <section className="match-full-scope" aria-label="合盘完整分析范围">
+            <small>10 积分完整报告</small>
+            <h3>无需选择方向，默认进行全维度合盘解析</h3>
+            <p>报告将完整覆盖关系总览、沟通方式、情感需求、冲突修复、长期发展、家庭协作、共同成长与现实建议。</p>
+          </section>
+        ) : (
+          <fieldset className="birth-fieldset topic-fieldset">
+            <legend>本次重点方向</legend>
+            <p>最多选择 3 项，完整报告会围绕所选课题组织。</p>
+            <div className="measure-topics">
+              {config.topics.map((topic) => (
+                <button type="button" key={topic} className={selected.includes(topic) ? "selected" : ""} onClick={() => toggleTopic(topic)}>{topic}</button>
+              ))}
+            </div>
+            <div className="topic-status"><span>已选 {selected.length}/3</span><button type="button" onClick={() => setSelected([])}>清空</button></div>
+          </fieldset>
+        )}
 
         <fieldset className="birth-fieldset">
           <legend>{kind === "chat" ? "你的问题" : "补充说明"}</legend>
@@ -209,6 +230,16 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
             ? ["正在校正并排盘…", "正在识别命盘主轴…", "正在生成深度分析…", "正在核对盘面依据…"][loadingStage]
             : "开始测算"} <span>{kind === "bazi" || kind === "ziwei" || kind === "match" ? "生成命盘与 AI 深度解读" : `完整专题 ${config.cost} 积分`}</span> →
         </button>
+        {loading && (
+          <section className="measurement-wait" aria-live="polite">
+            <div className="measurement-wait-head">
+              <div><small>正在生成准确命盘与完整报告</small><b>{remainingSeconds > 0 ? `预计还需 ${remainingSeconds} 秒` : "即将完成，请继续等待"}</b></div>
+              <span>{elapsedSeconds} 秒</span>
+            </div>
+            <div className="measurement-progress"><i style={{ width: `${loadingProgress}%` }} /></div>
+            <p>{["正在核对出生地点、时区与真太阳时。", "排盘已建立，正在识别命盘主轴。", "DeepSeek 正在撰写通俗、详细的解读。", "正在核对章节完整性与盘面依据。"][loadingStage]} 请保持页面打开，不要重复提交。</p>
+          </section>
+        )}
         <p className="measure-submit-help">点击后将使用已校正的真太阳时生成命盘；基础排盘与本页解读不扣积分。</p>
       </section>
 
@@ -222,7 +253,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
             <article><small>出生地点</small><b>{primaryBirth.place.name}</b><span>{primaryBirth.place.latitude.toFixed(4)}°, {primaryBirth.place.longitude.toFixed(4)}°</span></article>
             <article><small>历史时区</small><b>{primaryBirth.place.timezone}</b><span>UTC {primaryBirth.solarTime.timezoneOffsetMinutes / 60 >= 0 ? "+" : ""}{primaryBirth.solarTime.timezoneOffsetMinutes / 60}</span></article>
             <article><small>真太阳时</small><b>{primaryBirth.solarTime.trueSolarTime.replace("T", " ").slice(0, 16)}</b><span>总修正 {primaryBirth.solarTime.totalCorrectionMinutes} 分钟</span></article>
-            <article><small>报告方向</small><b>{selected.join(" · ")}</b><span>本页基础解读免费</span></article>
+            <article><small>报告方向</small><b>{kind === "match" ? "全维度合盘解析" : selected.join(" · ")}</b><span>{kind === "match" ? "完整覆盖八项关系主题" : "本页基础解读免费"}</span></article>
           </div>
           {chartResult?.kind === "bazi" && <BaziResult result={chartResult} />}
           {chartResult?.kind === "ziwei" && <ZiweiResult result={chartResult} />}
@@ -729,9 +760,8 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
           <small>{kind === "bazi" ? "AI · ZI PING EVIDENCE READING" : kind === "ziwei" ? "AI · ZIWEI EVIDENCE READING" : "AI · RELATIONSHIP EVIDENCE READING"}</small>
           <p>{kind === "bazi" ? "八字深度解析报告" : kind === "ziwei" ? "紫微斗数深度解析报告" : "双盘关系深度解析报告"}</p>
           <h3>{report.title}</h3>
-          <span>先由固定版本引擎排盘，再由 AI 依据带编号的盘面事实组织分析；系统已检查每一条引用，不允许模型自行补算命盘。</span>
+          <span>先由固定版本引擎完成排盘，再由 AI 根据结构化盘面事实组织分析。盘面计算与文字解读相互独立，系统会核对引用关系，不允许模型自行补算命盘。</span>
         </div>
-        <aside><small>报告版本</small><b>{report.promptVersion}</b><span>{report.provider.toUpperCase()} · {report.model} · {report.reportId.slice(0, 8)}</span></aside>
       </header>
 
       <section className="ai-direct-answer">
@@ -744,7 +774,7 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
         <div>{report.coreConclusions.map((item, index) => (
           <article key={`${item.title}-${index}`}>
             <b>{String(index + 1).padStart(2, "0")}</b>
-            <div><h4>{item.title}</h4><p>{item.conclusion}</p><EvidenceRefs refs={item.evidenceRefs} evidenceMap={evidenceMap} /></div>
+            <div><h4>{item.title}</h4><p>{item.conclusion}</p></div>
           </article>
         ))}</div>
       </section>
@@ -756,17 +786,17 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
       </nav>
 
       <article className="ai-report-chapter">
-        <header><small>CHAPTER · {active.id.toUpperCase()}</small><h3>{active.title}</h3><h4>{active.headline}</h4></header>
+        <header><small>专题解读</small><h3>{active.title}</h3><h4>{active.headline}</h4></header>
         <div className="ai-narrative">{active.narrative.map((paragraph, index) => <p key={`${active.id}-n-${index}`}>{paragraph}</p>)}</div>
 
         <section className="ai-expression-grid">
-          <article><small>建设性表达</small><p>{active.constructiveExpression}</p></article>
-          <article><small>压力下的表达</small><p>{active.pressureExpression}</p></article>
+          <article><small>顺势发挥时</small><p>{active.constructiveExpression}</p></article>
+          <article><small>容易卡住时</small><p>{active.pressureExpression}</p></article>
         </section>
 
         <section className="ai-evidence-section">
-          <header><small>盘面依据与推导</small><p>点击证据编号可查看排盘引擎返回的原始事实。</p></header>
-          <EvidenceRefs refs={active.evidenceRefs} evidenceMap={evidenceMap} expanded />
+          <header><small>为什么这样判断</small><p>下面展示排盘引擎返回的事实，以及这些事实与结论之间的推导关系。</p></header>
+          <EvidenceFacts refs={active.evidenceRefs} evidenceMap={evidenceMap} />
           <div>{active.evidenceExplanation.map((item, index) => <p key={`${active.id}-e-${index}`}>{item}</p>)}</div>
         </section>
 
@@ -774,14 +804,14 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
           <section className="ai-timing-section">
             <header><small>阶段与时间线</small><p>时间只表示议题与环境的变化窗口，不承诺具体事件。</p></header>
             <div>{active.timing.map((item, index) => (
-              <article key={`${item.period}-${index}`}><b>{item.period}</b><h4>{item.theme}</h4><p><em>可把握</em>{item.opportunity}</p><p><em>需留意</em>{item.caution}</p><EvidenceRefs refs={item.evidenceRefs} evidenceMap={evidenceMap} /></article>
+              <article key={`${item.period}-${index}`}><b>{item.period}</b><h4>{item.theme}</h4><p><em>可把握</em>{item.opportunity}</p><p><em>需留意</em>{item.caution}</p><EvidenceFacts refs={item.evidenceRefs} evidenceMap={evidenceMap} compact /></article>
             ))}</div>
           </section>
         )}
 
         <div className="ai-reflection-actions">
-          <section><small>现实核验问题</small>{active.reflectionQuestions.map((item, index) => <p key={`${active.id}-q-${index}`}>{item}</p>)}</section>
-          <section><small>行动建议</small>{active.actions.map((item, index) => <article key={`${item.horizon}-${index}`}><span>{item.horizon}</span><b>{item.title}</b><p>{item.detail}</p></article>)}</section>
+          <section><small>用现实验证</small>{active.reflectionQuestions.map((item, index) => <p key={`${active.id}-q-${index}`}>{item}</p>)}</section>
+          <section><small>可以马上做</small>{active.actions.map((item, index) => <article key={`${item.horizon}-${index}`}><span>{item.horizon}</span><b>{item.title}</b><p>{item.detail}</p></article>)}</section>
         </div>
       </article>
 
@@ -793,9 +823,11 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
   );
 }
 
-function EvidenceRefs({ refs, evidenceMap, expanded = false }: { refs: string[]; evidenceMap: Map<string, string>; expanded?: boolean }) {
-  return <div className={`ai-evidence-refs ${expanded ? "expanded" : ""}`}>{refs.map((ref) => (
-    <details key={ref} open={expanded}><summary>{ref}</summary><p>{evidenceMap.get(ref) || "证据目录中未找到该编号"}</p></details>
+function EvidenceFacts({ refs, evidenceMap, compact = false }: { refs: string[]; evidenceMap: Map<string, string>; compact?: boolean }) {
+  const facts = refs.map((ref) => evidenceMap.get(ref)).filter((fact): fact is string => Boolean(fact));
+  if (!facts.length) return null;
+  return <div className={`ai-evidence-facts ${compact ? "compact" : ""}`}>{facts.map((fact, index) => (
+    <article key={`${index}-${fact}`}><small>盘面事实 {index + 1}</small><p>{fact}</p></article>
   ))}</div>;
 }
 

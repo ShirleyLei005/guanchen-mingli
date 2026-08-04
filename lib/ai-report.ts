@@ -49,7 +49,7 @@ export class AiReportError extends Error {
   }
 }
 
-const PROMPT_VERSION = "deep-report-2026-08-03-v2";
+const PROMPT_VERSION = "deep-report-2026-08-04-v3";
 const REQUIRED_CHAPTERS: Record<ReportKind, string[]> = {
   bazi: ["overview", "personality", "career", "wealth", "relationships", "timing"],
   ziwei: ["overview", "personality", "career", "wealth", "relationships", "timing"],
@@ -178,12 +178,12 @@ function systemInstructions(kind: ReportKind) {
       ? "使用紫微斗数综合顺序：命身主轴→十二宫→三方四正→主辅星与四化→大限流年。不可只凭一颗主星、一个宫位或吉凶词下结论。"
       : "使用双盘关系分析顺序：先分别确认双方结构→寻找互动接口→区分互补与摩擦→讨论沟通、亲密、冲突修复、现实协作与共同成长。不得用单一匹配分数或命定标签裁决关系。";
   const chapterRule = kind === "compatibility"
-    ? "必须完整包含 id 为 overview、communication、intimacy、conflict、cooperation、growth 的六章。"
-    : "必须完整包含 id 为 overview、personality、career、wealth、relationships、timing 的六章；可按用户重点增加 family、health 或 growth。";
+    ? "chapters 必须且只能包含 id 为 overview、communication、intimacy、conflict、cooperation、growth 的六章，完整覆盖沟通、亲密、冲突修复、现实协作和共同成长，不得省略，也不要增加其他章节。"
+    : "chapters 必须且只能包含 id 为 overview、personality、career、wealth、relationships、timing 的六章；家庭、健康与成长等用户重点应融入这六章，不要增加其他章节。";
   return `你是观辰的资深传统命理报告编辑。${method}
 你的工作是解释服务端已经计算好的命盘，不是重新排盘。只能使用证据目录里的事实；严禁自行补算、改写或发明星曜、宫位、干支、十神、四化、运限。
-写成专业咨询式的简体中文长报告：先直接回应用户最关心的问题，再解释盘面结构、正向表达、压力表达、阶段变化与现实行动。每项核心结论和时间判断必须引用 evidenceRefs；引用只能是目录中存在的编号。
-${chapterRule}每章 narrative 正好三段，每段80至140个汉字，应有实质内容且避免重复套话；每章 timing 最多三项、actions 两至三项。时间判断只能使用目录明确提供的大运或流年；合盘不得把双方阶段不同步写成分手或结婚预言。
+写成专业但通俗的简体中文咨询报告，避免堆砌术语。必须使用命理术语时，紧接着用日常语言解释它对工作、关系、情绪或选择意味着什么。先直接回应用户最关心的问题，再解释盘面结构、正向表达、压力表达、阶段变化与现实行动。每项核心结论和时间判断必须引用 evidenceRefs；引用只能是目录中存在的编号。
+${chapterRule}每章 narrative 正好三段，每段80至140个汉字：第一段直接说“这意味着什么”，第二段解释“为什么这样判断”，第三段说明“现实中怎么观察和运用”；避免重复套话。evidenceExplanation 必须把盘面事实与结论之间的逻辑讲清楚，不能只复述证据。每章 timing 最多三项、actions 两至三项，行动建议要具体到可执行步骤。时间判断只能使用目录明确提供的大运或流年；合盘不得把双方阶段不同步写成分手或结婚预言。
 命盘揭示趋势与人生课题，不决定人生。禁止确定性婚期、离婚、疾病、寿命、灾祸、投资收益或法律结果；健康、投资、法律事项只给一般性提醒并建议咨询专业人士。不要伪造古籍引文，不要宣称准确率。`;
 }
 
@@ -606,9 +606,15 @@ export async function generateDeepReport(args: {
       : buildCompatibilityEvidence(args.chart as CompatibilityResult);
   const question = args.question?.trim() || `请围绕${args.topics.join("、") || "命盘总览"}进行完整分析。`;
   let result = await requestStructuredReport({ kind: args.kind, question, topics: args.topics, catalog });
+  result.parsed.chapters = REQUIRED_CHAPTERS[args.kind]
+    .map((id) => result.parsed.chapters.find((chapter) => chapter.id === id))
+    .filter((chapter): chapter is AiReportChapter => Boolean(chapter));
   let errors = validateReport(result.parsed, catalog, args.kind);
   if (errors.length) {
     result = await requestStructuredReport({ kind: args.kind, question, topics: args.topics, catalog, correction: `上一版未通过质量检查，请重写并修复：${errors.join("；")}` });
+    result.parsed.chapters = REQUIRED_CHAPTERS[args.kind]
+      .map((id) => result.parsed.chapters.find((chapter) => chapter.id === id))
+      .filter((chapter): chapter is AiReportChapter => Boolean(chapter));
     errors = validateReport(result.parsed, catalog, args.kind);
   }
   if (errors.length) throw new AiReportError("REPORT_VALIDATION_FAILED", `报告未通过证据与完整性检查：${errors.join("；")}`);

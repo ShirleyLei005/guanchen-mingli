@@ -55,6 +55,23 @@ test("Bazi and Ziwei forms expose the requested start button", async () => {
   }
 });
 
+test("measurement UX includes a visible wait state and full compatibility scope", async () => {
+  const source = await readFile(new URL("../app/measurement-page.tsx", import.meta.url), "utf8");
+  assert.match(source, /预计还需/);
+  assert.match(source, /正在生成准确命盘与完整报告/);
+  assert.match(source, /无需选择方向，默认进行全维度合盘解析/);
+  assert.match(source, /完整覆盖八项关系主题/);
+});
+
+test("public report UI hides internal version and evidence identifiers", async () => {
+  const source = await readFile(new URL("../app/measurement-page.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(source, />报告版本</);
+  assert.doesNotMatch(source, /report\.promptVersion|report\.reportId|report\.provider|report\.model/);
+  assert.doesNotMatch(source, /<summary>\{ref\}<\/summary>/);
+  assert.match(source, /为什么这样判断/);
+  assert.match(source, /盘面事实 \{index \+ 1\}/);
+});
+
 test("contains commercial data model and safety copy", async () => {
   const [schema, page] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
