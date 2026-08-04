@@ -111,7 +111,6 @@ export function BirthFields({
           autoComplete="name"
           maxLength={30}
         />
-        <small>合盘报告会使用这个名字展示双方信息。</small>
       </label>
       <div className="measure-row">
         <label>性别

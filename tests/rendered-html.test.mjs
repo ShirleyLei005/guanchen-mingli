@@ -60,6 +60,7 @@ test("birth forms collect a name for personalized reports", async () => {
   assert.match(source, /<label>姓名/);
   assert.match(source, /请输入姓名或常用称呼/);
   assert.match(source, /name: personName\.trim\(\)/);
+  assert.doesNotMatch(source, /合盘报告会使用这个名字展示双方信息/);
 });
 
 test("measurement UX includes a visible wait state and full compatibility scope", async () => {
