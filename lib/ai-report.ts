@@ -49,10 +49,10 @@ export class AiReportError extends Error {
   }
 }
 
-const PROMPT_VERSION = "deep-report-2026-08-04-v4";
+const PROMPT_VERSION = "deep-report-2026-08-04-v5";
 const REQUIRED_CHAPTERS: Record<ReportKind, string[]> = {
-  bazi: ["overview", "personality", "career", "wealth", "relationships", "timing"],
-  ziwei: ["overview", "personality", "career", "wealth", "relationships", "timing"],
+  bazi: ["overview", "career_wealth", "relationships", "health", "children", "family", "timing"],
+  ziwei: ["overview", "career_wealth", "relationships", "health", "children", "family", "timing"],
   compatibility: ["overview", "communication", "intimacy", "conflict", "cooperation", "growth"],
 };
 const BANNED_CERTAINTY = /一定结婚|必然结婚|一定离婚|必然离婚|命中注定|保证收益|稳赚|准确率\s*\d|寿命为|活到\d+岁|必有血光|必得重病/;
@@ -179,7 +179,7 @@ function systemInstructions(kind: ReportKind) {
       : "使用双盘关系分析顺序：先分别确认双方结构→寻找互动接口→区分互补与摩擦→讨论沟通、亲密、冲突修复、现实协作与共同成长。不得用单一匹配分数或命定标签裁决关系。";
   const chapterRule = kind === "compatibility"
     ? "chapters 必须且只能包含 id 为 overview、communication、intimacy、conflict、cooperation、growth 的六章，完整覆盖沟通、亲密、冲突修复、现实协作和共同成长，不得省略，也不要增加其他章节。"
-    : "chapters 必须且只能包含 id 为 overview、personality、career、wealth、relationships、timing 的六章；家庭、健康与成长等用户重点应融入这六章，不要增加其他章节。";
+    : "chapters 必须且只能包含七章：overview（命盘总览，含性格与人生主轴）、career_wealth（事业及财运）、relationships（感情及婚姻）、health（健康）、children（子女）、family（父母及兄弟）、timing（运势节奏及关键节点）。七章都必须完整生成，不要增加或省略章节。健康章只讨论生活方式、压力反应和一般性保养提醒；子女、婚姻及家庭章不得断言必有、必无或确定事件。";
   return `你是观辰的资深传统命理报告编辑。${method}
 你的工作是解释服务端已经计算好的命盘，不是重新排盘。只能使用证据目录里的事实；严禁自行补算、改写或发明星曜、宫位、干支、十神、四化、运限。
 写成专业但通俗的简体中文咨询报告，避免堆砌术语。必须使用命理术语时，紧接着用日常语言解释它对工作、关系、情绪或选择意味着什么。先直接回应用户最关心的问题，再解释盘面结构、正向表达、压力表达、阶段变化与现实行动。每项核心结论和时间判断必须引用 evidenceRefs；引用只能是目录中存在的编号。
@@ -271,8 +271,8 @@ async function requestDeepSeekReport(args: {
   if (!apiKey) throw new AiReportError("AI_NOT_CONFIGURED", "DeepSeek 深度报告服务尚未配置，请管理员设置 DEEPSEEK_API_KEY");
   const model = process.env.DEEPSEEK_REPORT_MODEL || "deepseek-v4-flash";
   const chapterTitles: Record<string, string> = {
-    overview: "命格总览", personality: "性格特质", career: "事业发展", wealth: "财富与资源",
-    relationships: "感情关系", timing: "阶段节奏", communication: "沟通模式", intimacy: "亲密需求",
+    overview: "命盘总览", career_wealth: "事业及财运", relationships: "感情及婚姻", health: "健康",
+    children: "子女", family: "父母及兄弟", timing: "运势节奏及关键节点", communication: "沟通模式", intimacy: "亲密需求",
     conflict: "冲突修复", cooperation: "现实协作", growth: "共同成长",
   };
   const context = { reportKind: args.kind, question: args.question, selectedTopics: args.topics, evidenceCatalog: args.catalog, correction: args.correction || "" };
@@ -343,8 +343,8 @@ async function requestSiliconFlowReport(args: {
     ? process.env.SILICONFLOW_COMPATIBILITY_MODEL || "Qwen/Qwen3-8B"
     : defaultModel;
   const chapterTitles: Record<string, string> = {
-    overview: "命格总览", personality: "性格特质", career: "事业发展", wealth: "财富与资源",
-    relationships: "感情关系", timing: "阶段节奏", communication: "沟通模式", intimacy: "亲密需求",
+    overview: "命盘总览", career_wealth: "事业及财运", relationships: "感情及婚姻", health: "健康",
+    children: "子女", family: "父母及兄弟", timing: "运势节奏及关键节点", communication: "沟通模式", intimacy: "亲密需求",
     conflict: "冲突修复", cooperation: "现实协作", growth: "共同成长",
   };
   const baseContext = {
@@ -371,7 +371,7 @@ async function requestSiliconFlowReport(args: {
     }),
     ...REQUIRED_CHAPTERS[args.kind].map((id) => () => callSiliconFlowJson({
       apiKey, model, maxTokens: 3000,
-      system: `${systemInstructions(args.kind)}\n本次只生成“${chapterTitles[id]}”一个章节，id 必须严格为 ${id}。narrative 正好3段，每段100至160个汉字；evidenceRefs 正好2至3项且必须有效；evidenceExplanation 正好2项；timing 最多1项；reflectionQuestions 正好2项；actions 正好2项。正向表达、压力表达和行动建议均须具体。只返回合法 JSON。`,
+      system: `${systemInstructions(args.kind)}\n本次只生成“${chapterTitles[id]}”一个章节，id 必须严格为 ${id}。narrative 正好4段，每段90至150个汉字；evidenceRefs 正好2至3项且必须有效；evidenceExplanation 正好2项；timing 最多1项；reflectionQuestions 正好2项；actions 正好2项。正向表达、压力表达和行动建议均须具体。只返回合法 JSON。`,
       user: {
         ...baseContext,
         chapterId: id,
@@ -380,7 +380,7 @@ async function requestSiliconFlowReport(args: {
           id,
           title: chapterTitles[id],
           headline: "本章核心判断",
-          narrative: ["第一段", "第二段", "第三段"],
+          narrative: ["含义", "依据", "具体表现", "验证与运用"],
           evidenceRefs: ["有效证据编号1", "有效证据编号2"],
           evidenceExplanation: ["证据如何支持判断1", "证据如何支持判断2"],
           constructiveExpression: "建设性表达",

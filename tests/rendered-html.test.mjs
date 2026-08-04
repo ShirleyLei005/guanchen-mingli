@@ -81,6 +81,18 @@ test("public report UI hides internal version and evidence identifiers", async (
   assert.doesNotMatch(source, /BAZI MCP|ZIWEI MCP CONTRACT|BOUND CHART/);
 });
 
+test("personal reports use seven requested modules and Ziwei shows chart only", async () => {
+  const [reportSource, pageSource] = await Promise.all([
+    readFile(new URL("../lib/ai-report.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/measurement-page.tsx", import.meta.url), "utf8"),
+  ]);
+  for (const label of ["命盘总览", "事业及财运", "感情及婚姻", "健康", "子女", "父母及兄弟", "运势节奏及关键节点"]) {
+    assert.match(reportSource, new RegExp(label));
+  }
+  assert.match(pageSource, /className="ziwei-chart-only"/);
+  assert.doesNotMatch(pageSource, /className="ziwei-analysis"|className="radar-stage"|analysisTabs/);
+});
+
 test("contains commercial data model and safety copy", async () => {
   const [schema, page] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),

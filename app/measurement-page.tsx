@@ -424,79 +424,17 @@ function BaziNarrativeReport({ result }: { result: BaziChartResult }) {
 }
 
 function ZiweiResult({ result }: { result: ZiweiChartResult }) {
-  const analysisTabs = [
-    ["命格总览", "命宫", "general"], ["财运", "财帛", "wealth"], ["事业", "官禄", "career"], ["感情", "夫妻", "relationships"],
-    ["副业", "财帛", "side_income"], ["婚姻时机", "夫妻", "marriage_timing"],
-    ["性格", "福德", "personality"], ["健康", "疾厄", "health"], ["兄弟合伙", "兄弟", "family"], ["子女", "子女", "family"],
-    ["迁移外出", "迁移", "career"], ["人际贵人", "仆役", "relationships"], ["田宅", "田宅", "wealth"], ["福德", "福德", "personality"], ["父母长辈", "父母", "family"],
-  ] as const;
-  const [analysisTab, setAnalysisTab] = useState<(typeof analysisTabs)[number][0]>("命格总览");
-  const [analysisMode, setAnalysisMode] = useState<"report" | "chat">("report");
-  const [question, setQuestion] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatReply, setChatReply] = useState<{ answer: string; evidence: string[]; tool: string; disclaimer: string } | null>(null);
-  const [chatError, setChatError] = useState("");
   const positions: Record<string, string> = {
     巳: "1 / 1", 午: "1 / 2", 未: "1 / 3", 申: "1 / 4",
     辰: "2 / 1", 酉: "2 / 4", 卯: "3 / 1", 戌: "3 / 4",
     寅: "4 / 1", 丑: "4 / 2", 子: "4 / 3", 亥: "4 / 4",
   };
-  const activeTab = analysisTabs.find(([label]) => label === analysisTab) ?? analysisTabs[0];
-  const selectedPalaceName = activeTab[1];
-  const selectedPalace = result.chart.palaces.find((palace) => palace.name.includes(selectedPalaceName)) ?? result.chart.palaces[0];
-  const selectedModule = result.interpretation?.find((module) => module.aspect === activeTab[2]);
-  const selectedStars = selectedPalace.majorStars.map((star) => star.name).join("、") || "无十四主星";
-  const mainStar = selectedPalace.majorStars[0]?.name || selectedPalace.minorStars[0]?.name || "宫位结构";
-  const starHeadlines: Record<string, string> = {
-    紫微: "统筹全局，建立自己的秩序", 天机: "善于推演，在变化中寻找路径", 太阳: "主动担当，以行动建立影响",
-    武曲: "务实推进，重视成果与边界", 天同: "保留柔软，创造稳定感", 廉贞: "辨明欲望，学习进退尺度",
-    天府: "藏才纳贤，稳健托底", 太阴: "细腻积累，重视内在安全", 贪狼: "资源广阔，课题在取舍",
-    巨门: "以表达辨真伪，也要避免过度质疑", 天相: "平衡规则，在协作中成事", 天梁: "守护原则，把经验变成支持",
-    七杀: "果断破局，先建立风险边界", 破军: "重组旧局，在变化中完成更新",
-  };
-  const scoreFor = (name: string) => {
-    const palace = result.chart.palaces.find((item) => item.name.includes(name));
-    if (!palace) return 52;
-    const mutagens = [...palace.majorStars, ...palace.minorStars].filter((star) => star.mutagen).length;
-    return Math.min(88, 48 + palace.majorStars.length * 10 + palace.minorStars.length * 2 + mutagens * 5);
-  };
-  const rawRadar = [scoreFor("官禄"), scoreFor("财帛"), scoreFor("夫妻"), scoreFor("福德"), scoreFor("疾厄")];
-  const radarValues = [Math.round(rawRadar.reduce((sum, value) => sum + value, 0) / rawRadar.length), ...rawRadar];
-  const radarPolygon = radarValues.map((value, index) => {
-    const angle = (-150 + index * 60) * Math.PI / 180;
-    const radius = value * 0.43;
-    return `${50 + Math.cos(angle) * radius}% ${50 + Math.sin(angle) * radius}%`;
-  }).join(", ");
-  const palaceMainStar = (name: string) =>
-    result.chart.palaces.find((palace) => palace.name.includes(name))?.majorStars[0]?.name || "宫位";
-  async function askChart() {
-    if (!result.chartId || !question.trim()) {
-      setChatError(result.chartId ? "请先输入你想了解的问题。" : "当前命盘缺少 chartId，请重新生成命盘。");
-      return;
-    }
-    setChatLoading(true);
-    setChatError("");
-    try {
-      const response = await fetch("/api/charts/ziwei/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chartId: result.chartId, question: question.trim() }),
-      });
-      const data = await response.json() as { status: string; answer?: string; evidence?: string[]; tool?: string; disclaimer?: string; message?: string };
-      if (!response.ok || data.status !== "success" || !data.answer) throw new Error(data.message || "分析失败");
-      setChatReply({ answer: data.answer, evidence: data.evidence ?? [], tool: data.tool ?? "interpret_chart", disclaimer: data.disclaimer ?? "" });
-    } catch (error) {
-      setChatError(error instanceof Error ? error.message : "分析失败，请重新生成命盘后再试。");
-    } finally {
-      setChatLoading(false);
-    }
-  }
   return (
     <div className="chart-output">
       <div className="chart-output-head">
         <div><small>紫微十二宫命盘</small><h3>命宫在{result.chart.soulPalaceBranch} · {result.chart.fiveElementsClass}</h3></div>
       </div>
-      <div className="ziwei-workbench">
+      <div className="ziwei-chart-only">
         <div className="ziwei-board-column">
           <div className="ziwei-direction north"><span>正南方</span><span>南偏西</span></div>
           <div className="ziwei-board-wrap">
@@ -548,61 +486,6 @@ function ZiweiResult({ result }: { result: ZiweiChartResult }) {
           <div className="ziwei-direction south"><span>东偏北</span><span>正北方</span><span>北偏西</span></div>
         </div>
 
-        <section className="ziwei-analysis">
-          <div className="analysis-mode">
-            <button className={analysisMode === "report" ? "active" : ""} type="button" onClick={() => setAnalysisMode("report")}>命盘分析</button>
-            <button className={analysisMode === "chat" ? "active" : ""} type="button" onClick={() => setAnalysisMode("chat")}>AI 对话</button>
-          </div>
-          {analysisMode === "report" ? (
-            <>
-              <div className="analysis-tabs" role="tablist" aria-label="紫微命盘分析领域">
-                {analysisTabs.map(([label]) => (
-                  <button type="button" role="tab" aria-selected={analysisTab === label} className={analysisTab === label ? "active" : ""} key={label} onClick={() => setAnalysisTab(label)}>{label}</button>
-                ))}
-              </div>
-              <div className="analysis-copy">
-                <p>{selectedModule?.title || selectedPalace.name} · {selectedStars}</p>
-                <h4>{selectedModule?.headline || starHeadlines[mainStar] || `${mainStar}入宫，从现实选择中理解课题`}</h4>
-                <span>{selectedModule?.summary || `${selectedPalace.name}位于${selectedPalace.heavenlyStem}${selectedPalace.earthlyBranch}。这里呈现的是该领域的关注方式与行动惯性，不是不可改变的结果。`}</span>
-              </div>
-              <div className="radar-stage" aria-label="六维命盘结构图">
-                <div className="radar-chart">
-                  {[92, 72, 52, 32].map((size) => <i key={size} className="radar-ring" style={{ width: `${size}%`, height: `${size}%` }} />)}
-                  <i className="radar-axis axis-a" /><i className="radar-axis axis-b" /><i className="radar-axis axis-c" />
-                  <div className="radar-data" style={{ clipPath: `polygon(${radarPolygon})` }} />
-                  <span className="radar-label radar-l1"><b>综合</b><small>命身结构</small></span>
-                  <span className="radar-label radar-l2"><b>事业</b><small>{palaceMainStar("官禄")}</small></span>
-                  <span className="radar-label radar-l3"><b>财运</b><small>{palaceMainStar("财帛")}</small></span>
-                  <span className="radar-label radar-l4"><b>感情</b><small>{palaceMainStar("夫妻")}</small></span>
-                  <span className="radar-label radar-l5"><b>性格</b><small>{palaceMainStar("福德")}</small></span>
-                  <span className="radar-label radar-l6"><b>健康</b><small>{palaceMainStar("疾厄")}</small></span>
-                </div>
-              </div>
-              <p className="radar-note">六维图仅表示盘面星曜与四化信息密度，不代表能力高低或吉凶评分</p>
-              <div className="analysis-evidence">
-                <article><small>盘面依据</small><b>{selectedModule?.evidence[0] || selectedStars}</b><span>{selectedModule?.evidence.slice(1).join("；") || `${selectedPalace.changsheng12} · ${selectedPalace.boshi12}`}</span></article>
-                <article><small>行动与课题</small><b>{selectedModule?.actions[0] || "这个领域正在要求我学习什么？"}</b><span>{selectedModule?.challenges.join("；") || "结合最近三个月的现实事件核对，不用单一星曜替自己下结论。"}</span></article>
-              </div>
-            </>
-          ) : (
-            <div className="ziwei-chat-panel">
-              <p>基于当前命盘继续分析</p>
-              <h4>基于这张命盘继续提问</h4>
-              <span>系统会按问题自动调用 interpret_chart；涉及今年、明年、流年或大限时，改用 analyze_fortune。</span>
-              <textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="例如：未来一年事业上最值得准备的课题是什么？" />
-              <button type="button" disabled={chatLoading} onClick={() => void askChart()}>{chatLoading ? "正在分析…" : "发送问题"}</button>
-              {chatError && <p className="ziwei-chat-error">{chatError}</p>}
-              {chatReply && (
-                <article className="ziwei-chat-reply">
-                  <small>{chatReply.tool}</small>
-                  <p>{chatReply.answer}</p>
-                  <details><summary>查看盘面依据</summary><ul>{chatReply.evidence.map((item) => <li key={item}>{item}</li>)}</ul></details>
-                  <i>{chatReply.disclaimer}</i>
-                </article>
-              )}
-            </div>
-          )}
-        </section>
       </div>
       <div className="fortune-timeline">
         <header><b>大限</b><span>十年阶段只表示观察窗口，不等于吉凶定论</span></header>

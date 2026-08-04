@@ -392,6 +392,8 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .decade-row b { color: #e3ca98; font-size: 17px; font-weight: 500; }
 .decade-row small { margin-top: 7px; color: rgba(255,255,255,.58); font: 11px/1.65 system-ui, sans-serif; }
 .ziwei-workbench { display: grid; grid-template-columns: minmax(750px, .95fr) minmax(560px, 1.05fr); gap: 0; margin-top: 18px; color: #252a28; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 22px 60px rgba(0,0,0,.18); }
+.ziwei-chart-only { margin-top: 18px; color: #252a28; background: #fcfcfa; border-radius: 16px; overflow: hidden; box-shadow: 0 22px 60px rgba(0,0,0,.18); }
+.ziwei-chart-only .ziwei-board-column { border-right: 0; }
 .ziwei-board-column { position: relative; padding: 23px 18px 30px; background: #fcfcfa; border-right: 1px solid #e5e4e0; overflow-x: auto; }
 .ziwei-board-wrap { width: 720px; margin: 0 auto; overflow: hidden; background: #fff; border: 1px solid #cac8c3; border-radius: 13px; box-shadow: 0 8px 24px rgba(30,40,35,.08); }
 .ziwei-board { display: grid; grid-template: repeat(4, 190px) / repeat(4, 180px); width: 720px; min-width: 720px; color: #252a28; background: #fff; }
