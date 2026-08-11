@@ -36,6 +36,30 @@ const productPaths: Record<Product, string> = {
   chat: "/chat",
 };
 
+const lifeQuestions = [
+  {
+    eyebrow: "问前路",
+    title: "守成蓄势，还是另开新局？",
+    description: "人生行至岔路，喧声纷至，心意未明。借命盘观天赋所长、时运所向，看清何处宜深耕，何处当转身，令才华与机缘相逢。",
+    tags: "天赋所长 · 事业格局 · 进退时机",
+    href: "/bazi",
+  },
+  {
+    eyebrow: "问缘分",
+    title: "是同心相契，还是课题相逢？",
+    description: "缘起有时，聚散有因。以双盘参看彼此的靠近方式、情绪所需与相处节奏，于吸引与摩擦之间，读懂关系真正要教会我们的事。",
+    tags: "情感需求 · 沟通模式 · 相处之道",
+    href: "/match",
+  },
+  {
+    eyebrow: "问时运",
+    title: "何时借势而起，何时藏锋以待？",
+    description: "命有其势，时有其序。察大限流年之起伏，辨机缘与暗涌，于顺流处乘风，于未明处守静，让每一次进退都多一分从容。",
+    tags: "流年节奏 · 机缘窗口 · 行动准备",
+    href: "/ziwei",
+  },
+] as const;
+
 function mockChart(date: string, gender: string): ChartResult {
   const seed = [...date, ...gender].reduce((sum, char) => sum + char.charCodeAt(0), 0);
   const stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"];
@@ -164,7 +188,7 @@ export function MingliApp() {
       <header className="nav-shell">
         <a className="brand" href="#top" aria-label="观辰首页">
           <GuanchenBrandMark />
-          <span><strong>观辰</strong><small>命盘与人生决策</small></span>
+          <span><strong>观辰</strong><small>东方命理 · 观势知行</small></span>
         </a>
         <nav className={mobileNav ? "open" : ""} aria-label="主导航">
           <Link href="/" onClick={() => setMobileNav(false)}>首页</Link>
@@ -184,9 +208,9 @@ export function MingliApp() {
         <div className="orbit orbit-one" />
         <div className="orbit orbit-two" />
         <div className="hero-copy">
-          <p className="eyebrow">确定性排盘 · 依据可追溯 · 选择在自己</p>
-          <h1>看见命盘中的线索，<br /><em>找回人生的主动权。</em></h1>
-          <p className="lead">八字看见时间结构与天赋惯性，紫微理解人生领域与阶段课题。观辰把复杂命理转化为清晰、可验证、能用于现实选择的分析，而不是替你预言人生。</p>
+          <p className="eyebrow">观天时 · 察人事 · 知进退</p>
+          <h1>解码东方智慧，<br /><em>洞见人生起伏。</em></h1>
+          <p className="lead">以八字观人生格局，以紫微察十二宫垣。循古法排盘，取今意解读，于星辰流转与五行生克之间，看见天赋、惯性与时运，也照见每一次选择所能抵达的远方。</p>
           <div className="hero-actions hero-product-actions" aria-label="选择测算类型">
             <a className="hero-product-btn primary" href="/bazi">
               <small>理解天赋与长期结构</small><strong>八字测算</strong><span>→</span>
@@ -198,7 +222,7 @@ export function MingliApp() {
               <small>理解靠近与磨合方式</small><strong>双人合盘</strong><span>→</span>
             </a>
           </div>
-          <div className="trust-row"><span>新用户赠 5 积分</span><span>先排盘，再解读</span><span>不作宿命式断言</span></div>
+          <div className="trust-row"><span>新用户赠 5 积分</span><span>推演有据，脉络可寻</span><span>知命而行，不囿于命</span></div>
         </div>
         <div className="hero-chart" aria-hidden="true">
           <div className="chart-ring">
@@ -212,15 +236,17 @@ export function MingliApp() {
 
       <section className="intent-section" id="compare">
         <div className="section-heading">
-          <p className="eyebrow">从真实处境出发</p>
-          <h2>这些问题，你可能反复想过。</h2>
-          <p>现在的方向值得坚持吗？这段关系该如何靠近？面对阶段变化，需要提前准备什么？不必先懂命理术语，从你真正关心的问题开始。</p>
+          <p className="eyebrow">心有所问 · 盘有所应</p>
+          <h2>人生万象，皆可从此刻的一问开始。</h2>
+          <p>不必先通术数，也无需拘泥吉凶。只需带着眼下最真实的困惑，观辰将循盘中线索，为你辨来路、察当下、望前程。</p>
         </div>
-        <div className="intent-grid">
-          {products.map((item, index) => (
-            <a key={item.id} href={productPaths[item.id]}>
-              <span>0{index + 1}</span><i>{item.stamp}</i>
-              <div><small>{item.intent}</small><strong>{item.title}</strong><em>{item.kicker} →</em></div>
+        <div className="question-grid">
+          {lifeQuestions.map((item) => (
+            <a key={item.eyebrow} href={item.href}>
+              <small>{item.eyebrow}</small>
+              <h3>{item.title}</h3>
+              <p>{item.description}</p>
+              <span>{item.tags}</span>
             </a>
           ))}
         </div>
@@ -229,8 +255,8 @@ export function MingliApp() {
       <section className="belief-section" id="belief">
         <div className="belief-intro">
           <p className="eyebrow">观辰的方法</p>
-          <h2>像研究者一样核对，像咨询报告一样表达。</h2>
-          <p>命理不是一句结论，而是一套能够复核的观察过程。我们先校准时空与盘面，再解释趋势与课题，最后把洞察带回现实行动。</p>
+          <h2>循古法以立盘，取今意以解人。</h2>
+          <p>命理之学，贵在有源、有据、有验。观辰先校出生时空，再依盘面陈其理、辨其势，最终落于今日可行之选择。</p>
         </div>
         <div className="belief-flow">
           <article><span>01</span><i>校</i><h3>校准时空</h3><p>匹配出生地坐标、历史时区与真太阳时，先把命盘的时间基础算清楚。</p></article>
@@ -242,8 +268,8 @@ export function MingliApp() {
       <section className="calculator-wrap" id="calculator">
         <div className="calculator-copy">
           <p className="eyebrow">四步建立命盘</p>
-          <h2>先把出生坐标算清楚，<br />再谈命盘与人生课题。</h2>
-          <p>出生地点不只是一个名称。系统会匹配经纬度与历史时区，并计算经度时差和均时差，得到排盘所需的真太阳时。</p>
+          <h2>先定生辰坐标，<br />再观命理乾坤。</h2>
+          <p>差之毫厘，盘或有别。系统将核对出生地经纬、历史时区、经度时差与均时差，以真太阳时为排盘之基。</p>
           <ol className="flow-progress">
             {steps.map((label, index) => (
               <li key={label} className={step >= index + 1 ? "active" : ""}>
@@ -366,7 +392,7 @@ export function MingliApp() {
       </section>
 
       <section className="report-demo">
-        <div className="section-heading"><p className="eyebrow">不是模板填充</p><h2>你不只看到结论，也能看见它如何得出。</h2><p>观辰把抽象命理拆成四个可以阅读、核对，并带回现实生活的层次。</p></div>
+        <div className="section-heading"><p className="eyebrow">言必有据 · 推演有章</p><h2>不止告知其然，更为你细说所以然。</h2><p>观辰将玄奥术理铺陈为四重脉络，使每一处判断皆有盘面可循，每一份洞察皆能落于现实。</p></div>
         <div className="report-columns">
           <article><span>01</span><h3>盘面事实</h3><p>先列出干支、十神、五行、宫位、主星和四化等确定性数据。</p></article>
           <article><span>02</span><h3>可能趋势</h3><p>说明哪些模式更容易被环境和阶段触发，同时标注其他可能。</p></article>
@@ -376,16 +402,16 @@ export function MingliApp() {
       </section>
 
       <section className="method-section">
-        <div className="method-quote"><span>“</span><p>命盘标出风向，<br />人生仍由你掌舵。</p></div>
+        <div className="method-quote"><span>“</span><p>命示其势，<br />人定其行。</p></div>
         <div className="method-copy">
-          <p className="eyebrow">清醒地理解命盘</p><h2>不是预测命运，而是提供决策参考</h2>
-          <p>干支、星曜、宫位与四化由固定版本引擎计算。报告帮助你梳理处境、辨认惯性与被忽略的变量，不用恐惧制造依赖，也不替你做人生决定。</p>
+          <p className="eyebrow">知命不认命 · 观势亦观心</p><h2>命盘可照见来风，却不替你走完长路</h2>
+          <p>干支、星曜、宫位与四化皆由固定版本引擎推得。报告所陈，是倾向、惯性与可供参照的时势；真正书写人生的，仍是你的见识、勇气与每一次行动。</p>
           <div className="method-points"><span><b>01</b>盘面事实可追溯</span><span><b>02</b>趋势不等于必然</span><span><b>03</b>每次解读回到行动</span></div>
         </div>
       </section>
 
       <section className="knowledge" id="knowledge">
-        <div className="section-heading"><p className="eyebrow">命理课堂</p><h2>先理解命盘，再决定如何使用它</h2><p>真正有用的命理，不是制造神秘感，而是帮助你形成更诚实的自我观察。</p></div>
+        <div className="section-heading"><p className="eyebrow">命理课堂</p><h2>读古法之源流，明命盘之所以然</h2><p>术数不应止于神秘。知其法度，明其边界，方能以清醒之心观命，以自在之身行路。</p></div>
         <div className="article-grid">
           <article><span>八字入门 · 6 分钟</span><h3>为什么八字以节气换月，而不是农历初一？</h3><p>从时间坐标理解四柱排盘的第一条基础规则。</p><a href="#calculator">阅读全文 →</a></article>
           <article><span>紫微入门 · 8 分钟</span><h3>命宫、身宫与十二宫，分别在说什么？</h3><p>一张紫微命盘的结构，比星曜吉凶更值得先看。</p><a href="#calculator">阅读全文 →</a></article>
@@ -404,10 +430,10 @@ export function MingliApp() {
       </section>
 
       <footer>
-        <div className="brand footer-brand"><GuanchenBrandMark /><span><strong>观辰</strong><small>命盘与人生决策</small></span></div>
+        <div className="brand footer-brand"><GuanchenBrandMark /><span><strong>观辰</strong><small>东方命理 · 观势知行</small></span></div>
         <p>传统文化娱乐与自我反思参考，不构成医疗、投资、法律或其他专业建议。</p>
         <div><a href="#top">隐私政策</a><a href="#top">用户协议</a><a href="#knowledge">联系我们</a></div>
-        <small>© 2026 观辰 · 看见趋势，理解课题，主动选择</small>
+        <small>© 2026 观辰 · 观天时，察人事，知进退</small>
       </footer>
 
       {showRecharge && (

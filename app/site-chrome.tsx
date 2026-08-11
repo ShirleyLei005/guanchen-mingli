@@ -30,7 +30,7 @@ export function SiteHeader({ active }: { active?: string }) {
     <header className="sub-nav">
       <Link className="brand" href="/" aria-label="观辰首页">
         <GuanchenBrandMark />
-        <span><strong>观辰</strong><small>命盘与人生决策</small></span>
+        <span><strong>观辰</strong><small>东方命理 · 观势知行</small></span>
       </Link>
       <nav className={open ? "open" : ""} aria-label="主导航">
         {items.map(([href, label, id]) => (
@@ -51,10 +51,10 @@ export function SiteHeader({ active }: { active?: string }) {
 export function SiteFooter() {
   return (
     <footer>
-      <div className="brand footer-brand"><GuanchenBrandMark /><span><strong>观辰</strong><small>命盘与人生决策</small></span></div>
+      <div className="brand footer-brand"><GuanchenBrandMark /><span><strong>观辰</strong><small>东方命理 · 观势知行</small></span></div>
       <p>传统文化娱乐与自我反思参考，不构成医疗、投资、法律或其他专业建议。</p>
       <div><Link href="/knowledge">隐私说明</Link><Link href="/knowledge">用户协议</Link><Link href="/knowledge">联系我们</Link></div>
-      <small>© 2026 观辰 · 看见趋势，理解课题，主动选择</small>
+      <small>© 2026 观辰 · 观天时，察人事，知进退</small>
     </footer>
   );
 }
