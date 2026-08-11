@@ -41,8 +41,9 @@ async function getWorkerWithDeepSeekMock() {
     const request = JSON.parse(String(init?.body || "{}"));
     const context = JSON.parse(request.messages[1].content);
     if (context.task === "chart_question") {
+      const shortAnswer = String(context.question).includes("短回答恢复测试");
       return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({
-        answer: `${paragraph.repeat(5)}具体到现实行动，可以先记录触发情境、自己的第一反应和实际结果，再对照盘面证据做复盘。`.slice(0, 520),
+        answer: shortAnswer ? paragraph.repeat(2).slice(0, 230) : `${paragraph.repeat(5)}具体到现实行动，可以先记录触发情境、自己的第一反应和实际结果，再对照盘面证据做复盘。`.slice(0, 520),
         evidenceRefs: [context.evidenceCatalog[0].id, context.evidenceCatalog[1].id],
         actions: ["记录三次真实事件与反馈", "一个月后复盘选择是否更清晰"],
         boundary: "命盘提示趋势，不替代现实判断。",
@@ -150,4 +151,18 @@ test("Guanchen analysis answers 400-600 characters and charges two credits only 
     { waitUntil() {}, passThroughOnException() {} },
   );
   assert.equal(insufficient.status, 402);
+});
+
+test("short but evidence-grounded model output is completed instead of discarded", async () => {
+  const worker = await getWorkerWithDeepSeekMock();
+  const report = mockReport("bazi");
+  report.evidenceCatalog = [
+    { id: "B001", text: "四柱测试依据显示日主与月令形成明确的力量关系，需要结合现实承担方式观察。" },
+    { id: "B003", text: "五行结构测试依据显示资源、表达与行动之间存在需要协调的环节。" },
+  ];
+  const response = await call(worker, "/api/charts/chat", { kind: "bazi", question: "短回答恢复测试", report, history: [] }, 5);
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.ok(result.answer.length >= 400 && result.answer.length <= 600);
+  assert.equal(result.remainingCredits, 3);
 });
