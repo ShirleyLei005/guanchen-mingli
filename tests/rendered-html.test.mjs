@@ -94,6 +94,15 @@ test("personal reports use seven requested modules and Ziwei shows chart only", 
   assert.doesNotMatch(pageSource, /className="ziwei-analysis"|className="radar-stage"|analysisTabs/);
 });
 
+test("main navigation removes the standalone chart question link", async () => {
+  const [headerSource, homeSource] = await Promise.all([
+    readFile(new URL("../app/site-chrome.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/mingli-app.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.doesNotMatch(headerSource, /\["\/chat",\s*"命盘问答"/);
+  assert.doesNotMatch(homeSource, /className="nav-hot" href="\/chat"/);
+});
+
 test("contains commercial data model and safety copy", async () => {
   const [schema, page] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),

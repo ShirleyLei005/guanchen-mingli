@@ -192,7 +192,6 @@ export function MingliApp() {
           <a href="/bazi">八字测算</a>
           <a href="/ziwei">紫微斗数</a>
           <a href="/match">合盘测算</a>
-          <a className="nav-hot" href="/chat">命盘问答 <i>热门</i></a>
           <a href="/knowledge">命理课堂</a>
         </nav>
         <div className="account-actions">

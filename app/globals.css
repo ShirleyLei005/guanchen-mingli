@@ -660,8 +660,10 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .ai-report-tabs { display: flex; padding: 0 38px; overflow-x: auto; border-bottom: 1px solid #dcd0bc; background: #f1e8d9; scrollbar-width: none; }
 .ai-report-tabs button { flex: 0 0 auto; padding: 20px 22px; color: #707872; background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; font-size: 15px; }
 .ai-report-tabs button.active { color: #173d32; border-bottom-color: #b88b4b; font-weight: 700; }
-.ai-report-tabs .ai-chat-tab { margin-left: auto; color: #8f6330; }
-.chart-chat-panel { padding: 58px; background: #fbf6ed; }
+.ai-report-tabs .ai-chat-tab { position: sticky; right: 0; z-index: 3; margin-left: auto; min-width: 150px; color: #fff; background: #1d493b; border-left: 1px solid #d0ad69; border-bottom-color: #d0ad69; box-shadow: -14px 0 24px rgba(42,53,47,.15); font-weight: 700; letter-spacing: .06em; }
+.ai-report-tabs .ai-chat-tab::before { content: "✦"; margin-right: 8px; color: #e0bd76; }
+.ai-report-tabs .ai-chat-tab:hover, .ai-report-tabs .ai-chat-tab.active { color: #173d32; background: #dfbd7c; border-bottom-color: #173d32; }
+.chart-chat-panel { padding: 58px; background: linear-gradient(135deg,#fbf6ed 0%,#f2e8d6 100%); border-top: 4px solid #c49a55; }
 .chart-chat-panel > header { max-width: 900px; }
 .chart-chat-panel > header small { color: #a87536; font: 700 12px/1.5 system-ui,sans-serif; letter-spacing: .06em; }
 .chart-chat-panel > header h3 { margin: 16px 0 10px; color: #173d32; font-size: clamp(30px,3.5vw,46px); font-weight: 400; }
@@ -915,7 +917,7 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
   .measurement-wait-head { flex-direction: column; gap: 6px; }
   .ai-core-conclusions > div, .ai-expression-grid, .ai-evidence-facts, .ai-timing-section > div, .ai-reflection-actions { grid-template-columns: 1fr; }
   .ai-report-tabs { padding: 0 8px; }
-  .ai-report-tabs .ai-chat-tab { margin-left: 0; }
+  .ai-report-tabs .ai-chat-tab { margin-left: 0; min-width: 132px; }
   .chart-chat-compose { grid-template-columns: 1fr; }
   .chart-chat-compose button { min-height: 54px; }
   .chart-chat-messages > article { max-width: 100%; }

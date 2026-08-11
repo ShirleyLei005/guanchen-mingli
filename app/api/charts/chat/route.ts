@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
   const credits = readCredits(request);
   if (credits < PRODUCT_COSTS.conversation_message) {
-    return NextResponse.json({ status: "error", code: "INSUFFICIENT_CREDITS", message: "当前积分不足，本次提问需要 3 积分", credits }, { status: 402 });
+    return NextResponse.json({ status: "error", code: "INSUFFICIENT_CREDITS", message: "当前积分不足，本次提问需要 2 积分", credits }, { status: 402 });
   }
   try {
     const reply = await answerChartQuestion({

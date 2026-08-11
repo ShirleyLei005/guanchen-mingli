@@ -34,7 +34,7 @@ const configs = {
     title: "命盘问答",
     eyebrow: "固定命盘 · 连续追问 · 现实选择",
     intro: "建立固定命盘后，围绕工作、感情、关系与时间节点继续提问，让每一轮讨论都回到现实行动。",
-    cost: 3,
+    cost: 2,
     topics: ["近期选择", "事业追问", "感情追问", "关系决策", "时间节点", "行动复盘"],
   },
 } as const;
@@ -652,8 +652,8 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
   async function askChartQuestion() {
     const question = chatQuestion.trim();
     if (!question || chatLoading) return;
-    if (chatCredits < 3) {
-      setChatNotice("当前积分不足，本次提问需要 3 积分。");
+    if (chatCredits < 2) {
+      setChatNotice("当前积分不足，本次提问需要 2 积分。");
       return;
     }
     setChatLoading(true);
@@ -676,7 +676,7 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
       });
       const data = await response.json() as { answer?: string; actions?: string[]; message?: string; creditCost?: number; remainingCredits?: number };
       if (!response.ok || !data.answer) throw new Error(data.message || "AI 暂时无法回答，请稍后重试。");
-      setChatCredits(Number.isFinite(data.remainingCredits) ? Number(data.remainingCredits) : Math.max(0, chatCredits - (data.creditCost || 3)));
+      setChatCredits(Number.isFinite(data.remainingCredits) ? Number(data.remainingCredits) : Math.max(0, chatCredits - (data.creditCost || 2)));
       setChatMessages((current) => [...current, { role: "user", text: question }, { role: "assistant", text: data.answer!, actions: data.actions }]);
       setChatQuestion("");
     } catch (error) {
@@ -720,7 +720,7 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
 
       {chatActive ? (
         <section className="chart-chat-panel">
-          <header><small>基于当前命盘继续追问</small><h3>关于这张盘，你还想了解什么？</h3><p>AI 会结合本次排盘依据和前文结论回答。每次成功回答消耗 3 积分，失败不扣积分。</p></header>
+          <header><small>基于当前命盘继续追问</small><h3>关于这张盘，你还想了解什么？</h3><p>AI 会结合本次排盘依据和前文结论，提供不少于 500 字的专业分析。每次成功回答消耗 2 积分，失败不扣积分。</p></header>
           <div className="chart-chat-balance"><span>当前余额</span><b>{chatCredits} 积分</b></div>
           <div className="chart-chat-messages" aria-live="polite">
             {chatMessages.length === 0 ? (
@@ -731,7 +731,7 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
           </div>
           <div className="chart-chat-compose">
             <textarea value={chatQuestion} onChange={(event) => setChatQuestion(event.target.value)} maxLength={500} placeholder="写下你的具体问题，背景越清楚，回答越有针对性。" />
-            <button type="button" disabled={chatLoading || !chatQuestion.trim()} onClick={() => void askChartQuestion()}>{chatLoading ? "正在结合命盘分析…" : "发送问题 · 3 积分"}</button>
+            <button type="button" disabled={chatLoading || !chatQuestion.trim()} onClick={() => void askChartQuestion()}>{chatLoading ? "正在结合命盘分析…" : "发送问题 · 2 积分"}</button>
           </div>
           {chatNotice && <p className="chart-chat-notice">{chatNotice}</p>}
         </section>

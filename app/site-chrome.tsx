@@ -10,7 +10,6 @@ export function SiteHeader({ active }: { active?: string }) {
     ["/bazi", "八字测算", "bazi"],
     ["/ziwei", "紫微斗数", "ziwei"],
     ["/match", "合盘测算", "match"],
-    ["/chat", "命盘问答", "chat"],
     ["/knowledge", "命理课堂", "knowledge"],
   ];
 
@@ -23,7 +22,7 @@ export function SiteHeader({ active }: { active?: string }) {
       <nav className={open ? "open" : ""} aria-label="主导航">
         {items.map(([href, label, id]) => (
           <Link key={id} className={active === id ? "active" : ""} href={href} onClick={() => setOpen(false)}>
-            {label}{id === "chat" && <i>热门</i>}
+            {label}
           </Link>
         ))}
       </nav>
