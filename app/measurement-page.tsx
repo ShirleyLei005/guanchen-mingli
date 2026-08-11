@@ -128,8 +128,20 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
             deepReport: true,
           }),
         });
-        const data = await response.json() as BaziChartResult | ZiweiChartResult | { error?: string; message?: string };
-        if (!response.ok || "error" in data) throw new Error("message" in data && data.message ? data.message : "排盘服务暂时不可用，请稍后重试。");
+        const data = await response.json() as BaziChartResult | ZiweiChartResult | { error?: string; code?: string; message?: string };
+        if (!response.ok || "error" in data) {
+          if ("code" in data && data.code === "AUTH_REQUIRED") {
+            setNotice(data.message || "请先登录后再解锁完整报告。");
+            window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
+            return;
+          }
+          if ("code" in data && data.code === "INSUFFICIENT_CREDITS") {
+            setNotice(data.message || "当前积分不足，请先充值。");
+            window.dispatchEvent(new CustomEvent("guanchen:open-recharge"));
+            return;
+          }
+          throw new Error("message" in data && data.message ? data.message : "排盘服务暂时不可用，请稍后重试。");
+        }
         syncCredits(data);
         setChartResult(data as BaziChartResult | ZiweiChartResult);
       } else if (kind === "match" && secondaryBirth) {
@@ -145,8 +157,20 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
             deepReport: true,
           }),
         });
-        const data = await response.json() as CompatibilityResult | { error?: string; message?: string };
-        if (!response.ok || "error" in data) throw new Error("message" in data && data.message ? data.message : "合盘服务暂时不可用，请稍后重试。");
+        const data = await response.json() as CompatibilityResult | { error?: string; code?: string; message?: string };
+        if (!response.ok || "error" in data) {
+          if ("code" in data && data.code === "AUTH_REQUIRED") {
+            setNotice(data.message || "请先登录后再解锁双人合盘。");
+            window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
+            return;
+          }
+          if ("code" in data && data.code === "INSUFFICIENT_CREDITS") {
+            setNotice(data.message || "当前积分不足，请先充值。");
+            window.dispatchEvent(new CustomEvent("guanchen:open-recharge"));
+            return;
+          }
+          throw new Error("message" in data && data.message ? data.message : "合盘服务暂时不可用，请稍后重试。");
+        }
         syncCredits(data);
         setChartResult(data as CompatibilityResult);
       }
@@ -620,7 +644,8 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
   const [chatQuestion, setChatQuestion] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatNotice, setChatNotice] = useState("");
-  const [chatCredits, setChatCredits] = useState(5);
+  const [chatCredits, setChatCredits] = useState(0);
+  const [authenticated, setAuthenticated] = useState(false);
   const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string; actions?: string[] }>>([]);
   const chatActive = activeId === "ai_chat";
   const timingLocked = activeId === "timing_unlock";
@@ -629,19 +654,46 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
   const evidenceMap = new Map(report.evidenceCatalog.map((item) => [item.id, item.text]));
 
   useEffect(() => {
-    void fetch("/api/charts/chat")
+    void fetch("/api/credits")
       .then((response) => response.json())
-      .then((data: { credits?: number }) => {
+      .then((data: { authenticated?: boolean; credits?: number }) => {
+        setAuthenticated(Boolean(data.authenticated));
         if (Number.isFinite(data.credits) && Number(data.credits) >= 0) setChatCredits(Number(data.credits));
       })
       .catch(() => undefined);
+    const updateBalance = (event: Event) => setChatCredits(Number((event as CustomEvent<number>).detail));
+    const updateSession = (event: Event) => {
+      const detail = (event as CustomEvent<{ authenticated?: boolean; credits?: number }>).detail;
+      setAuthenticated(Boolean(detail?.authenticated));
+      if (Number.isFinite(detail?.credits)) setChatCredits(Number(detail?.credits));
+    };
+    window.addEventListener("guanchen:credits", updateBalance);
+    window.addEventListener("guanchen:session", updateSession);
+    return () => {
+      window.removeEventListener("guanchen:credits", updateBalance);
+      window.removeEventListener("guanchen:session", updateSession);
+    };
   }, []);
+
+  function requireLogin() {
+    window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
+  }
+
+  function openRecharge() {
+    window.dispatchEvent(new CustomEvent("guanchen:open-recharge"));
+  }
 
   async function askChartQuestion() {
     const question = chatQuestion.trim();
     if (!question || chatLoading) return;
+    if (!authenticated) {
+      setChatNotice("请先登录后再使用观辰解析，登录后新用户可获赠 5 积分。");
+      requireLogin();
+      return;
+    }
     if (chatCredits < 2) {
-      setChatNotice("当前积分不足，本次提问需要 2 积分。");
+      setChatNotice("当前积分不足，本次提问需要 2 积分，可充值后继续。");
+      openRecharge();
       return;
     }
     setChatLoading(true);
@@ -678,8 +730,14 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
 
   async function unlockTimingReport() {
     if (timingLoading || kind === "compatibility") return;
+    if (!authenticated) {
+      setTimingNotice("请先登录后再解锁流年分析，登录后新用户可获赠 5 积分。");
+      requireLogin();
+      return;
+    }
     if (chatCredits < 3) {
-      setTimingNotice("当前积分不足，解锁流年分析需要 3 积分。");
+      setTimingNotice("当前积分不足，解锁流年分析需要 3 积分，可充值后继续。");
+      openRecharge();
       return;
     }
     setTimingLoading(true);

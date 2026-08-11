@@ -15,7 +15,7 @@ export default function LoginPage() {
         <div className="login-value">
           <p>YOUR CHART, CONTINUED</p>
           <h1>保存一张命盘，<br />持续理解同一个人生。</h1>
-          <ul><li>保存出生档案与真太阳时校正结果</li><li>登录赠送 5 体验积分</li><li>查看历史报告并基于固定命盘追问</li></ul>
+          <ul><li>保存出生档案与真太阳时校正结果</li><li>新用户注册免费获赠 5 积分</li><li>查看历史报告并基于固定命盘追问</li></ul>
         </div>
         <LoginCard />
       </section>

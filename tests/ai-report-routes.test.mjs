@@ -80,10 +80,38 @@ async function getWorkerWithDeepSeekMock(options = {}) {
 
 async function call(worker, path, body, credits = 1000) {
   return worker.fetch(
-    new Request(`http://localhost${path}`, { method: "POST", headers: { "content-type": "application/json", cookie: `guanchen_credits=${credits}` }, body: JSON.stringify(body) }),
+    new Request(`http://localhost${path}`, { method: "POST", headers: { "content-type": "application/json", ...(credits ? { cookie: credits } : {}) }, body: JSON.stringify(body) }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
     { waitUntil() {}, passThroughOnException() {} },
   );
+}
+
+async function registerUser(worker, email = "tester@example.com") {
+  const response = await worker.fetch(
+    new Request("http://localhost/api/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "123456", displayName: "测试用户" }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  const setCookie = response.headers.get("set-cookie") || "";
+  const session = (setCookie.match(/guanchen_session=([^;]+)/) || [])[1];
+  return { cookie: `guanchen_session=${session}`, response, json: await response.json() };
+}
+
+async function grantTesterCredits(worker, cookie) {
+  const response = await worker.fetch(
+    new Request("http://localhost/api/sandbox/tester-credits", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ code: "GC100-8A11-K7Q4" }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(response.status, 200);
 }
 
 test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSeek reports", async () => {
@@ -94,15 +122,19 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
     ["/api/charts/ziwei", { trueSolarTime: "2000-01-01T12:00:00", gender: "male", topics: ["命盘总览"], notes: "虚构测试样本", deepReport: true }],
     ["/api/charts/compatibility", { mode: "bazi", first: { name: "子安", trueSolarTime: "2000-01-01T12:00:00", gender: "male" }, second: { name: "清和", trueSolarTime: "2001-02-02T13:00:00", gender: "female" }, topics: ["关系总览"], notes: "虚构双盘测试样本", deepReport: true }],
   ];
+  const { cookie } = await registerUser(worker);
+  await grantTesterCredits(worker, cookie);
+  let expectedBalance = 105;
   for (const [path, body] of cases) {
-    const response = await call(worker, path, body);
+    const response = await call(worker, path, body, cookie);
     assert.equal(response.status, 200, `${path} should generate a report`);
     const result = await response.json();
     assert.equal(result.aiReport.provider, "deepseek");
     assert.equal(result.aiReport.model, "deepseek-v4-flash");
     assert.equal(result.aiReport.chapters.length, 6);
     assert.equal(result.creditCost, path.includes("compatibility") ? 10 : 5);
-    assert.equal(result.creditBalance, path.includes("compatibility") ? 990 : 995);
+    expectedBalance -= path.includes("compatibility") ? 10 : 5;
+    assert.equal(result.creditBalance, expectedBalance);
     assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.length === 4), true);
     assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.every((paragraph) => /[。！？]$/.test(paragraph))), true);
     if (!path.includes("compatibility")) {
@@ -135,11 +167,11 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
     }
   }
 
-  const timingResponse = await call(worker, "/api/charts/timing", { kind: "bazi", evidenceCatalog: baziReport.evidenceCatalog }, 100);
+  const timingResponse = await call(worker, "/api/charts/timing", { kind: "bazi", evidenceCatalog: baziReport.evidenceCatalog }, cookie);
   assert.equal(timingResponse.status, 200);
   const timing = await timingResponse.json();
   assert.equal(timing.creditCost, 3);
-  assert.equal(timing.remainingCredits, 97);
+  assert.equal(timing.remainingCredits, expectedBalance - 3);
   assert.equal(timing.chapter.id, "timing");
   assert.equal(timing.chapter.title, "流年运势及关键节点");
   assert.equal(timing.chapter.timing.length, 4);
@@ -148,46 +180,44 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
   assert.equal(timing.chapter.narrative.every((paragraph) => /[。！？]$/.test(paragraph)), true);
 });
 
-test("new test registrations receive five credits without resetting an existing balance", async () => {
+test("new registrations receive five credits exactly once and repeated registration is rejected", async () => {
   const worker = await getWorkerWithDeepSeekMock();
-  const registration = await worker.fetch(
-    new Request("http://localhost/api/credits/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "new@example.com", password: "123456" }) }),
-    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
-    { waitUntil() {}, passThroughOnException() {} },
-  );
-  assert.equal(registration.status, 200);
-  assert.deepEqual(await registration.json(), { status: "success", credits: 5, isNew: true });
-  assert.match(registration.headers.get("set-cookie") || "", /guanchen_credits=5/);
+  const registration = await registerUser(worker, "new@example.com");
+  assert.equal(registration.response.status, 200);
+  assert.equal(registration.json.credits, 5);
+  assert.equal(registration.json.isNew, true);
+  assert.match(registration.response.headers.get("set-cookie") || "", /guanchen_session=/);
+
+  const second = await registerUser(worker, "new@example.com");
+  assert.equal(second.response.status, 409);
 });
 
 test("Guanchen analysis answers 400-600 characters and charges two credits only on success", async () => {
   const worker = await getWorkerWithDeepSeekMock();
   const report = mockReport("bazi");
   report.evidenceCatalog = [{ id: "B001", text: "四柱测试依据" }, { id: "B003", text: "五行结构测试依据" }];
+  const { cookie } = await registerUser(worker, "chat@example.com");
+  await grantTesterCredits(worker, cookie);
   const response = await call(worker, "/api/charts/chat", {
     kind: "bazi",
     question: "未来一年事业上应该优先准备什么？",
     report,
     history: [],
-  }, 5);
+  }, cookie);
   assert.equal(response.status, 200);
   const result = await response.json();
   assert.equal(result.creditCost, 2);
-  assert.equal(result.remainingCredits, 3);
+  assert.equal(result.remainingCredits, 103);
   assert.ok(result.answer.length >= 400 && result.answer.length <= 600);
   assert.deepEqual(result.evidenceRefs, ["B001", "B003"]);
-  assert.match(response.headers.get("set-cookie") || "", /guanchen_credits=3/);
 
-  const insufficient = await worker.fetch(
-    new Request("http://localhost/api/charts/chat", {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie: "guanchen_credits=1" },
-      body: JSON.stringify({ kind: "bazi", question: "继续追问", report, history: [] }),
-    }),
-    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
-    { waitUntil() {}, passThroughOnException() {} },
-  );
-  assert.equal(insufficient.status, 402);
+  const secondResponse = await call(worker, "/api/charts/chat", { kind: "bazi", question: "继续追问", report, history: [] }, cookie);
+  assert.equal(secondResponse.status, 200);
+  assert.equal((await secondResponse.json()).remainingCredits, 101);
+
+  const thirdResponse = await call(worker, "/api/charts/chat", { kind: "bazi", question: "第三次追问", report, history: [] }, cookie);
+  assert.equal(thirdResponse.status, 200);
+  assert.equal((await thirdResponse.json()).remainingCredits, 99);
 });
 
 test("short but evidence-grounded model output is completed instead of discarded", async () => {
@@ -197,11 +227,13 @@ test("short but evidence-grounded model output is completed instead of discarded
     { id: "B001", text: "四柱测试依据显示日主与月令形成明确的力量关系，需要结合现实承担方式观察。" },
     { id: "B003", text: "五行结构测试依据显示资源、表达与行动之间存在需要协调的环节。" },
   ];
-  const response = await call(worker, "/api/charts/chat", { kind: "bazi", question: "短回答恢复测试", report, history: [] }, 5);
+  const { cookie } = await registerUser(worker, "short@example.com");
+  await grantTesterCredits(worker, cookie);
+  const response = await call(worker, "/api/charts/chat", { kind: "bazi", question: "短回答恢复测试", report, history: [] }, cookie);
   assert.equal(response.status, 200);
   const result = await response.json();
   assert.ok(result.answer.length >= 400 && result.answer.length <= 600);
-  assert.equal(result.remainingCredits, 3);
+  assert.equal(result.remainingCredits, 103);
 });
 
 test("timing report retries one malformed AI response, succeeds, and charges only after success", async () => {
@@ -216,10 +248,12 @@ test("timing report retries one malformed AI response, succeeds, and charges onl
     { id: "B071", text: "2027年丁未：下一年流年主题" },
     { id: "B072", text: "2028年戊申：随后流年主题" },
   ];
-  const response = await call(worker, "/api/charts/timing", { kind: "bazi", evidenceCatalog: report.evidenceCatalog }, 20);
+  const { cookie } = await registerUser(worker, "timing@example.com");
+  await grantTesterCredits(worker, cookie);
+  const response = await call(worker, "/api/charts/timing", { kind: "bazi", evidenceCatalog: report.evidenceCatalog }, cookie);
   const result = await response.json();
   assert.equal(response.status, 200, JSON.stringify(result));
   assert.equal(result.chapter.id, "timing");
-  assert.equal(result.remainingCredits, 17);
+  assert.equal(result.remainingCredits, 102);
   assert.equal(options.calls, 2, "one malformed response should trigger exactly one retry without a redundant summary request");
 });

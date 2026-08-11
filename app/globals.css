@@ -36,6 +36,7 @@ button { color: inherit; }
 .nav-shell .nav-hot i { position: absolute; left: 50%; bottom: 19px; white-space: nowrap; color: var(--pine-dark); background: #e0c28b; padding: 2px 5px; border-radius: 8px 8px 8px 2px; font-size: 8px; font-style: normal; font-weight: 700; }
 .account-actions { display: flex; align-items: center; gap: 15px; font-family: system-ui, sans-serif; font-size: 12px; }
 .credit-pill { border: 1px solid rgba(255,255,255,.4); background: rgba(255,255,255,.08); color: #fff; border-radius: 999px; padding: 9px 15px; cursor: pointer; }
+.credit-pill[href] { display: inline-flex; align-items: center; text-decoration: none; }
 .credit-pill span { display: inline-grid; place-items: center; background: #d4b274; color: var(--pine-dark); border-radius: 50%; width: 21px; height: 21px; margin-right: 4px; }
 
 .hero { min-height: 780px; padding: 155px 8vw 90px; display: grid; grid-template-columns: 1.08fr .92fr; align-items: center; position: relative; overflow: hidden; color: #fff; background: radial-gradient(circle at 78% 30%, #3d745f 0, #214c3d 30%, #12382d 70%); }
@@ -312,6 +313,23 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .modal-package span { text-align: left; }
 .modal-package b, .modal-package small { display: block; }
 .modal-package small { color: #8a918d; margin-top: 3px; }
+.payment-modal h2 { margin: 6px 0 12px; }
+.payment-order { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); margin: 24px 0; }
+.payment-order span { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #fffdf7; }
+.payment-order small { color: #7a837e; font: 12px/1.5 system-ui, sans-serif; }
+.payment-order b { color: var(--pine); font: 650 15px/1.4 system-ui, sans-serif; }
+.payment-confirm { width: 100%; justify-content: center; margin-top: 8px; }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 24px; }
+.auth-tabs button { padding: 11px; border: 1px solid var(--line); background: transparent; cursor: pointer; font: 700 12px/1.4 system-ui, sans-serif; }
+.auth-tabs button.selected { color: #fff; background: var(--pine); border-color: var(--pine); }
+.gift-hint { margin: -8px 0 18px; color: #7a837e; font-size: 13px; }
+.gift-hint b { color: var(--gold); }
+.gift-banner { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; padding: 18px; margin: 26px 0; border: 1px solid rgba(184,145,83,.45); background: #faf3e4; }
+.gift-banner b { color: var(--pine); font-size: 24px; font-weight: 500; }
+.gift-banner span { color: #5f6a64; line-height: 1.7; font-size: 14px; }
+.login-success h2 { margin-bottom: 4px; }
+.login-success .primary-btn { width: 100%; margin-top: 12px; justify-content: center; text-decoration: none; }
+.login-success .text-reset { display: block; margin: 18px 0 0; text-align: center; color: var(--jade); font: 12px/1.6 system-ui, sans-serif; }
 .menu-toggle { display: none; border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff; padding: 8px 10px; cursor: pointer; }
 
 .inner-page { min-height: 100vh; background: #efe9dc; }
@@ -322,7 +340,9 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .sub-nav nav i { margin-left: 6px; padding: 2px 5px; color: var(--pine-dark); background: #e0c28b; border-radius: 999px; font-size: 8px; font-style: normal; }
 .sub-account { display: flex; align-items: center; gap: 10px; font: 12px/1 system-ui, sans-serif; white-space: nowrap; }
 .sub-credit { padding: 10px 13px; border: 1px solid rgba(255,255,255,.28); }
-.sub-account button { display: none; border: 1px solid rgba(255,255,255,.3); background: transparent; color: #fff; padding: 8px 10px; }
+.sub-credit, .sub-logout { font: 12px/1 system-ui, sans-serif; cursor: pointer; }
+.sub-logout { display: inline-block; opacity: .7; background: transparent; border: 0; color: inherit; padding: 8px 4px; }
+.sub-account button:not(.sub-logout) { display: none; border: 1px solid rgba(255,255,255,.3); background: transparent; color: #fff; padding: 8px 10px; }
 
 .measure-hero { padding: 78px 20px 58px; text-align: center; color: #fff; background: radial-gradient(circle at 78% 20%, #3f735e 0, var(--pine) 34%, var(--pine-dark) 78%); }
 .measure-hero > p, .knowledge-hero > p, .login-value > p, .measure-form-head > p, .measure-result > div:first-child > p { margin: 0 0 15px; color: #d7b878; font: 700 10px/1 system-ui, sans-serif; letter-spacing: .24em; }

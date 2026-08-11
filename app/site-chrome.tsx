@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { GuanchenBrandMark } from "./brand-mark";
 import { useEffect, useState } from "react";
+import { RechargeModal } from "./recharge-modal";
 
 export function SiteHeader({ active }: { active?: string }) {
   const [open, setOpen] = useState(false);
-  const [credits, setCredits] = useState(5);
+  const [session, setSession] = useState<{ authenticated: boolean; credits: number }>({ authenticated: false, credits: 0 });
   const items = [
     ["/", "首页", "home"],
     ["/bazi", "八字测算", "bazi"],
@@ -18,13 +19,33 @@ export function SiteHeader({ active }: { active?: string }) {
   useEffect(() => {
     const refresh = () => void fetch("/api/credits")
       .then((response) => response.json())
-      .then((data: { credits?: number }) => Number.isFinite(data.credits) && setCredits(Number(data.credits)))
+      .then((data: { authenticated?: boolean; credits?: number }) => {
+        setSession({ authenticated: Boolean(data.authenticated), credits: Number(data.credits) || 0 });
+      })
       .catch(() => undefined);
     refresh();
-    const update = (event: Event) => setCredits(Number((event as CustomEvent<number>).detail));
-    window.addEventListener("guanchen:credits", update);
-    return () => window.removeEventListener("guanchen:credits", update);
+    const updateBalance = (event: Event) => setSession((current) => ({ ...current, credits: Number((event as CustomEvent<number>).detail) }));
+    const updateSession = (event: Event) => {
+      const detail = (event as CustomEvent<{ authenticated?: boolean; credits?: number }>).detail;
+      setSession({ authenticated: Boolean(detail?.authenticated), credits: Number(detail?.credits) || 0 });
+    };
+    window.addEventListener("guanchen:credits", updateBalance);
+    window.addEventListener("guanchen:session", updateSession);
+    return () => {
+      window.removeEventListener("guanchen:credits", updateBalance);
+      window.removeEventListener("guanchen:session", updateSession);
+    };
   }, []);
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.dispatchEvent(new CustomEvent("guanchen:session", { detail: { authenticated: false, credits: 0 } }));
+    window.location.href = "/";
+  }
+
+  function openRecharge() {
+    window.dispatchEvent(new CustomEvent("guanchen:open-recharge"));
+  }
 
   return (
     <header className="sub-nav">
@@ -41,9 +62,17 @@ export function SiteHeader({ active }: { active?: string }) {
       </nav>
       <div className="sub-account">
         <Link href="/login">登录</Link>
-        <Link className="sub-credit" href="/login">{credits} 积分</Link>
+        {session.authenticated ? (
+          <>
+            <button className="sub-credit" onClick={openRecharge}>{session.credits} 积分</button>
+            <button className="sub-logout" onClick={() => void logout()}>退出</button>
+          </>
+        ) : (
+          <Link className="sub-credit" href="/login">登录领 5 积分</Link>
+        )}
         <button aria-label="打开菜单" aria-expanded={open} onClick={() => setOpen((value) => !value)}>☰</button>
       </div>
+      <RechargeModal />
     </header>
   );
 }

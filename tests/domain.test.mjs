@@ -22,4 +22,10 @@ test("migration contains idempotency and immutable ledger structures", async () 
   assert.match(migration, /ledger_idempotency_idx/);
   assert.match(migration, /orders_idempotency_idx/);
   assert.match(migration, /payment_event_idx/);
+  const authMigration = await import("node:fs/promises").then(({ readFile }) =>
+    readFile(new URL("../drizzle/0002_auth_payments.sql", import.meta.url), "utf8")
+  );
+  assert.match(authMigration, /password_hash/);
+  assert.match(authMigration, /CREATE TABLE `sessions`/);
+  assert.match(authMigration, /credit_packages/);
 });

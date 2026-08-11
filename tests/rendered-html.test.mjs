@@ -153,15 +153,16 @@ test("main navigation removes the standalone chart question link", async () => {
 });
 
 test("contains commercial data model and safety copy", async () => {
-  const [schema, page] = await Promise.all([
+  const [schema, page, paymentModal] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/mingli-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/recharge-modal.tsx", import.meta.url), "utf8"),
   ]);
   for (const entity of ["birthProfiles", "charts", "reports", "creditLedger", "orders", "paymentEvents"]) {
     assert.match(schema, new RegExp(`export const ${entity}`));
   }
   assert.match(page, /传统文化娱乐与自我反思参考/);
-  assert.match(page, /支付沙箱/);
+  assert.match(paymentModal, /支付沙箱|沙箱支付|沙箱模拟/);
 });
 
 test("true solar time endpoint applies historical timezone, longitude and equation-of-time correction", async () => {

@@ -6,6 +6,7 @@ import type { PlaceMatch, SolarTimeResult } from "../lib/solar-time";
 import { GuanchenWait } from "./guanchen-wait";
 import { PlaceHierarchyPicker } from "./place-hierarchy-picker";
 import { GuanchenBrandMark } from "./brand-mark";
+import { RechargeModal } from "./recharge-modal";
 
 type Product = "bazi" | "ziwei" | "match" | "chat";
 type ChartResult = {
@@ -91,8 +92,7 @@ export function MingliApp() {
   const [solarLoading, setSolarLoading] = useState(false);
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState<ChartResult | null>(null);
-  const [credits, setCredits] = useState(5);
-  const [showRecharge, setShowRecharge] = useState(false);
+  const [session, setSession] = useState<{ authenticated: boolean; credits: number }>({ authenticated: false, credits: 0 });
   const [notice, setNotice] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
 
@@ -100,12 +100,22 @@ export function MingliApp() {
   const effectiveDate = solarTime?.trueSolarTime.slice(0, 16) ?? date;
 
   useEffect(() => {
-    const update = (event: Event) => setCredits(Number((event as CustomEvent<number>).detail));
-    void fetch("/api/credits").then((response) => response.json()).then((data: { credits?: number }) => {
-      if (Number.isFinite(data.credits)) setCredits(Number(data.credits));
-    }).catch(() => undefined);
-    window.addEventListener("guanchen:credits", update);
-    return () => window.removeEventListener("guanchen:credits", update);
+    const refresh = () => void fetch("/api/credits")
+      .then((response) => response.json())
+      .then((data: { authenticated?: boolean; credits?: number }) => setSession({ authenticated: Boolean(data.authenticated), credits: Number(data.credits) || 0 }))
+      .catch(() => undefined);
+    refresh();
+    const updateBalance = (event: Event) => setSession((current) => ({ ...current, credits: Number((event as CustomEvent<number>).detail) }));
+    const updateSession = (event: Event) => {
+      const detail = (event as CustomEvent<{ authenticated?: boolean; credits?: number }>).detail;
+      setSession({ authenticated: Boolean(detail?.authenticated), credits: Number(detail?.credits) || 0 });
+    };
+    window.addEventListener("guanchen:credits", updateBalance);
+    window.addEventListener("guanchen:session", updateSession);
+    return () => {
+      window.removeEventListener("guanchen:credits", updateBalance);
+      window.removeEventListener("guanchen:session", updateSession);
+    };
   }, []);
 
   useEffect(() => {
@@ -169,18 +179,20 @@ export function MingliApp() {
   }
 
   function unlock() {
-    if (credits < current.cost) {
-      setShowRecharge(true);
+    if (!session.authenticated) {
+      setNotice("请先登录。登录后新用户可免费获得 5 积分，用于解锁八字或紫微斗数完整报告。");
+      window.location.href = "/login?returnTo=/";
       return;
     }
-    setCredits((value) => value - current.cost);
+    if (session.credits < current.cost) {
+      window.dispatchEvent(new CustomEvent("guanchen:open-recharge"));
+      return;
+    }
     setNotice(`已解锁「${topic}」示范报告，扣除 ${current.cost} 积分。正式报告仍需服务端排盘引擎。`);
   }
 
-  function recharge(amount: number) {
-    setCredits((value) => value + amount);
-    setShowRecharge(false);
-    setNotice(`沙箱充值成功，已到账 ${amount} 积分。`);
+  function openRecharge() {
+    window.dispatchEvent(new CustomEvent("guanchen:open-recharge"));
   }
 
   return (
@@ -199,9 +211,14 @@ export function MingliApp() {
         </nav>
         <div className="account-actions">
           <a href="/login">登录</a>
-          <button className="credit-pill" onClick={() => setShowRecharge(true)}><span>余</span>{credits} 体验积分</button>
+          {session.authenticated ? (
+            <button className="credit-pill" onClick={openRecharge}><span>余</span>{session.credits} 积分</button>
+          ) : (
+            <a className="credit-pill" href="/login"><span>礼</span>登录领 5 积分</a>
+          )}
           <button className="menu-toggle" aria-label="打开菜单" aria-expanded={mobileNav} onClick={() => setMobileNav((value) => !value)}>☰</button>
         </div>
+        <RechargeModal />
       </header>
 
       <section className="hero" id="top">
@@ -436,17 +453,6 @@ export function MingliApp() {
         <small>© 2026 观辰 · 观天时，察人事，知进退</small>
       </footer>
 
-      {showRecharge && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="积分充值">
-          <div className="modal">
-            <button className="modal-close" onClick={() => setShowRecharge(false)} aria-label="关闭">×</button>
-            <p className="eyebrow">支付沙箱</p><h2>选择积分包</h2><p>本地验收模式不会产生真实付款。</p>
-            {[["10", "¥9.9"], ["50", "¥39"], ["120", "¥79"]].map(([amount, price]) => (
-              <button className="modal-package" key={amount} onClick={() => recharge(Number(amount))}><span><b>{amount} 积分</b><small>即时到账</small></span><strong>{price} →</strong></button>
-            ))}
-          </div>
-        </div>
-      )}
     </main>
   );
 }
