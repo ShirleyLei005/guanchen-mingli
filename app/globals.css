@@ -21,7 +21,11 @@ button { color: inherit; }
 
 .nav-shell { height: 82px; padding: 0 3.5vw; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,.15); position: absolute; inset: 0 0 auto; z-index: 20; color: #fff; }
 .brand { display: flex; align-items: center; gap: 11px; }
-.brand-mark { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 50% 50% 44% 56%; font-size: 21px; }
+.brand-mark { width: 47px; height: 42px; position: relative; display: inline-block; flex: 0 0 auto; }
+.brand-mark-eye:before, .brand-mark-eye:after { content: ""; position: absolute; left: 4px; right: 4px; height: 19px; border-radius: 50%; }
+.brand-mark-eye:before { top: 2px; border-top: 3px solid currentColor; }
+.brand-mark-eye:after { bottom: 2px; border-bottom: 3px solid #d8bb83; }
+.brand-mark-eye i { position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; margin: -3.5px; border-radius: 50%; background: #d8bb83; box-shadow: 0 -7px 0 -2px #d8bb83, 0 7px 0 -2px #d8bb83, 7px 0 0 -2px #d8bb83, -7px 0 0 -2px #d8bb83; }
 .brand strong, .brand small { display: block; }
 .brand strong { font-size: 20px; letter-spacing: .18em; }
 .brand small { font-size: 9px; letter-spacing: .24em; opacity: .7; margin-top: 3px; }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { GuanchenBrandMark } from "./brand-mark";
 import { useEffect, useState } from "react";
 
 export function SiteHeader({ active }: { active?: string }) {
@@ -28,8 +29,8 @@ export function SiteHeader({ active }: { active?: string }) {
   return (
     <header className="sub-nav">
       <Link className="brand" href="/" aria-label="观辰首页">
-        <span className="brand-mark">观</span>
-        <span><strong>观辰</strong><small>东方命理研究所</small></span>
+        <GuanchenBrandMark />
+        <span><strong>观辰</strong><small>命盘与人生决策</small></span>
       </Link>
       <nav className={open ? "open" : ""} aria-label="主导航">
         {items.map(([href, label, id]) => (
@@ -50,7 +51,7 @@ export function SiteHeader({ active }: { active?: string }) {
 export function SiteFooter() {
   return (
     <footer>
-      <div className="brand footer-brand"><span className="brand-mark">观</span><span><strong>观辰</strong><small>东方命理研究所</small></span></div>
+      <div className="brand footer-brand"><GuanchenBrandMark /><span><strong>观辰</strong><small>命盘与人生决策</small></span></div>
       <p>传统文化娱乐与自我反思参考，不构成医疗、投资、法律或其他专业建议。</p>
       <div><Link href="/knowledge">隐私说明</Link><Link href="/knowledge">用户协议</Link><Link href="/knowledge">联系我们</Link></div>
       <small>© 2026 观辰 · 看见趋势，理解课题，主动选择</small>

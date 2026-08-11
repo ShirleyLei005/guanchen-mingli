@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { PlaceMatch, SolarTimeResult } from "../lib/solar-time";
 import { GuanchenWait } from "./guanchen-wait";
 import { PlaceHierarchyPicker } from "./place-hierarchy-picker";
+import { GuanchenBrandMark } from "./brand-mark";
 
 type Product = "bazi" | "ziwei" | "match" | "chat";
 type ChartResult = {
@@ -162,8 +163,8 @@ export function MingliApp() {
     <main>
       <header className="nav-shell">
         <a className="brand" href="#top" aria-label="观辰首页">
-          <span className="brand-mark">观</span>
-          <span><strong>观辰</strong><small>东方命理研究所</small></span>
+          <GuanchenBrandMark />
+          <span><strong>观辰</strong><small>命盘与人生决策</small></span>
         </a>
         <nav className={mobileNav ? "open" : ""} aria-label="主导航">
           <Link href="/" onClick={() => setMobileNav(false)}>首页</Link>
@@ -183,21 +184,21 @@ export function MingliApp() {
         <div className="orbit orbit-one" />
         <div className="orbit orbit-two" />
         <div className="hero-copy">
-          <p className="eyebrow">看见趋势 · 理解课题 · 主动选择</p>
-          <h1>读懂命盘，<br /><em>不把人生交给命盘。</em></h1>
-          <p className="lead">借八字看见时间与天赋，借紫微理解关系与人生领域。命盘呈现的是趋势、惯性和可能遇见的课题，而你如何理解、选择与行动，才真正塑造人生。</p>
+          <p className="eyebrow">确定性排盘 · 依据可追溯 · 选择在自己</p>
+          <h1>看见命盘中的线索，<br /><em>找回人生的主动权。</em></h1>
+          <p className="lead">八字看见时间结构与天赋惯性，紫微理解人生领域与阶段课题。观辰把复杂命理转化为清晰、可验证、能用于现实选择的分析，而不是替你预言人生。</p>
           <div className="hero-actions hero-product-actions" aria-label="选择测算类型">
             <a className="hero-product-btn primary" href="/bazi">
-              <small>看整体结构</small><strong>八字测算</strong><span>→</span>
+              <small>理解天赋与长期结构</small><strong>八字测算</strong><span>→</span>
             </a>
             <a className="hero-product-btn" href="/ziwei">
-              <small>看具体领域</small><strong>紫微斗数测算</strong><span>→</span>
+              <small>看清十二宫人生课题</small><strong>紫微斗数测算</strong><span>→</span>
             </a>
             <a className="hero-product-btn" href="/match">
-              <small>看关系互动</small><strong>双人合盘</strong><span>→</span>
+              <small>理解靠近与磨合方式</small><strong>双人合盘</strong><span>→</span>
             </a>
           </div>
-          <div className="trust-row"><span>新用户赠 5 积分</span><span>每项解读有盘面依据</span><span>不作宿命式断言</span></div>
+          <div className="trust-row"><span>新用户赠 5 积分</span><span>先排盘，再解读</span><span>不作宿命式断言</span></div>
         </div>
         <div className="hero-chart" aria-hidden="true">
           <div className="chart-ring">
@@ -211,9 +212,9 @@ export function MingliApp() {
 
       <section className="intent-section" id="compare">
         <div className="section-heading">
-          <p className="eyebrow">从真实问题出发</p>
-          <h2>此刻，你最想看清什么？</h2>
-          <p>不必先学会命理术语。选择最接近你现实处境的问题，我们会推荐更合适的观察工具。</p>
+          <p className="eyebrow">从真实处境出发</p>
+          <h2>这些问题，你可能反复想过。</h2>
+          <p>现在的方向值得坚持吗？这段关系该如何靠近？面对阶段变化，需要提前准备什么？不必先懂命理术语，从你真正关心的问题开始。</p>
         </div>
         <div className="intent-grid">
           {products.map((item, index) => (
@@ -228,13 +229,13 @@ export function MingliApp() {
       <section className="belief-section" id="belief">
         <div className="belief-intro">
           <p className="eyebrow">观辰的方法</p>
-          <h2>命盘给出线索，人生仍由你作答。</h2>
-          <p>我们不追求一句“准不准”的判决，而是把命盘变成一套可以回到现实、帮助行动的观察方法。</p>
+          <h2>像研究者一样核对，像咨询报告一样表达。</h2>
+          <p>命理不是一句结论，而是一套能够复核的观察过程。我们先校准时空与盘面，再解释趋势与课题，最后把洞察带回现实行动。</p>
         </div>
         <div className="belief-flow">
-          <article><span>01</span><i>见</i><h3>看见倾向</h3><p>辨认天赋、惯性与阶段趋势，知道哪些力量正在影响你。</p></article>
-          <article><span>02</span><i>知</i><h3>理解课题</h3><p>理解反复出现的关系模式、内在冲突与此刻需要面对的成长主题。</p></article>
-          <article><span>03</span><i>行</i><h3>主动选择</h3><p>把洞察带回现实，用更清醒的行动回应命盘，而不是把决定权交出去。</p></article>
+          <article><span>01</span><i>校</i><h3>校准时空</h3><p>匹配出生地坐标、历史时区与真太阳时，先把命盘的时间基础算清楚。</p></article>
+          <article><span>02</span><i>证</i><h3>追溯依据</h3><p>每项判断回到干支、十神、宫位、星曜和四化，不让结论凭空出现。</p></article>
+          <article><span>03</span><i>行</i><h3>回到选择</h3><p>把趋势翻译成现实问题、观察信号与行动建议，最终决定权始终在你手中。</p></article>
         </div>
       </section>
 
@@ -365,7 +366,7 @@ export function MingliApp() {
       </section>
 
       <section className="report-demo">
-        <div className="section-heading"><p className="eyebrow">报告不是一句吉凶</p><h2>每个结论，都要回到依据与行动。</h2><p>我们把抽象命理拆成四个可以阅读、质疑和带回现实的层次。</p></div>
+        <div className="section-heading"><p className="eyebrow">不是模板填充</p><h2>你不只看到结论，也能看见它如何得出。</h2><p>观辰把抽象命理拆成四个可以阅读、核对，并带回现实生活的层次。</p></div>
         <div className="report-columns">
           <article><span>01</span><h3>盘面事实</h3><p>先列出干支、十神、五行、宫位、主星和四化等确定性数据。</p></article>
           <article><span>02</span><h3>可能趋势</h3><p>说明哪些模式更容易被环境和阶段触发，同时标注其他可能。</p></article>
@@ -375,10 +376,10 @@ export function MingliApp() {
       </section>
 
       <section className="method-section">
-        <div className="method-quote"><span>“</span><p>星盘指出天气，<br />掌舵的人始终是你。</p></div>
+        <div className="method-quote"><span>“</span><p>命盘标出风向，<br />人生仍由你掌舵。</p></div>
         <div className="method-copy">
-          <p className="eyebrow">清醒地理解命盘</p><h2>尊重传统方法，拒绝宿命式答案</h2>
-          <p>干支、星曜、宫位与四化由确定性算法计算。解读只负责呈现可能性、惯性与课题，不用恐惧制造依赖，也不替你做人生决定。</p>
+          <p className="eyebrow">清醒地理解命盘</p><h2>不是预测命运，而是提供决策参考</h2>
+          <p>干支、星曜、宫位与四化由固定版本引擎计算。报告帮助你梳理处境、辨认惯性与被忽略的变量，不用恐惧制造依赖，也不替你做人生决定。</p>
           <div className="method-points"><span><b>01</b>盘面事实可追溯</span><span><b>02</b>趋势不等于必然</span><span><b>03</b>每次解读回到行动</span></div>
         </div>
       </section>
@@ -403,7 +404,7 @@ export function MingliApp() {
       </section>
 
       <footer>
-        <div className="brand footer-brand"><span className="brand-mark">观</span><span><strong>观辰</strong><small>东方命理研究所</small></span></div>
+        <div className="brand footer-brand"><GuanchenBrandMark /><span><strong>观辰</strong><small>命盘与人生决策</small></span></div>
         <p>传统文化娱乐与自我反思参考，不构成医疗、投资、法律或其他专业建议。</p>
         <div><a href="#top">隐私政策</a><a href="#top">用户协议</a><a href="#knowledge">联系我们</a></div>
         <small>© 2026 观辰 · 看见趋势，理解课题，主动选择</small>

@@ -3,21 +3,21 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
-  title: "观辰 · 读懂命盘，不把人生交给命盘",
-  description: "八字、紫微斗数与合盘分析。自动匹配出生地经纬度与历史时区，校正真太阳时，从趋势中看见人生课题。",
+  title: "观辰 · 看见命盘中的线索，找回人生的主动权",
+  description: "八字、紫微斗数与双人合盘。校准出生时空，以确定性排盘和可追溯依据理解趋势、课题与现实选择。",
   icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
   openGraph: {
-    title: "观辰 · 读懂命盘，不把人生交给命盘",
-    description: "看见趋势，理解课题，主动选择。八字与紫微斗数真太阳时排盘。",
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: "观辰命理网站" }],
+    title: "观辰 · 看见命盘中的线索，找回人生的主动权",
+    description: "先校准时空，再排盘解读。看见趋势，理解课题，主动选择。",
+    images: [{ url: "/og-v2.png", width: 1200, height: 630, alt: "观辰：看见命盘中的线索，找回人生的主动权" }],
     locale: "zh_CN",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "观辰 · 读懂命盘，不把人生交给命盘",
-    description: "看见趋势，理解课题，主动选择。八字与紫微斗数真太阳时排盘。",
-    images: ["/og.png"],
+    title: "观辰 · 看见命盘中的线索，找回人生的主动权",
+    description: "先校准时空，再排盘解读。看见趋势，理解课题，主动选择。",
+    images: ["/og-v2.png"],
   },
 };
 
