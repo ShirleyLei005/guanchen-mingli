@@ -106,6 +106,14 @@ test("personal reports separate the paid timing module and repeat Guanchen consu
   assert.doesNotMatch(source, /问这张盘 · 2 积分/);
 });
 
+test("geocoding deduplicates the same administrative place instead of comparing coordinates only", async () => {
+  const source = await readFile(new URL("../app/api/geocode/route.ts", import.meta.url), "utf8");
+  assert.match(source, /semanticPlaceKey/);
+  assert.match(source, /dedupePlaceMatches/);
+  assert.match(source, /matchesRequestedPlace/);
+  assert.doesNotMatch(source, /Math\.abs\(candidate\.latitude - place\.latitude\)/);
+});
+
 test("main navigation removes the standalone chart question link", async () => {
   const [headerSource, homeSource] = await Promise.all([
     readFile(new URL("../app/site-chrome.tsx", import.meta.url), "utf8"),

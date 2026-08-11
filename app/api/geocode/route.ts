@@ -25,12 +25,15 @@ type ArcGisCandidate = {
 };
 
 function normalizePlaceText(value: string) {
-  return value.normalize("NFKC").replace(/特别行政区|自治区|自治州|地区|省|市|区|县|州|盟/g, "").replace(/[\s,，/·._-]/g, "").toLowerCase();
+  return value.normalize("NFKC")
+    .replace(/(?:特别行政区|自治区|自治州|地区|省|市|区|县|盟)(?=$|[\s,，/·._-])/g, "")
+    .replace(/[\s,，/·._-]/g, "")
+    .toLowerCase();
 }
 
 function queryParts(query: string) {
   const marked = query
-    .replace(/(特别行政区|自治区|自治州|地区|省|市|区|县|州|盟)/g, "$1|")
+    .replace(/(特别行政区|自治区|自治州|地区|省|市|区|县|盟)/g, "$1|")
     .split(/[|,，/·]+/)
     .map((item) => item.trim())
     .filter((item) => item.length >= 2);
@@ -50,6 +53,35 @@ function relevance(place: PlaceMatch, query: string) {
   if (target.includes(whole)) score += 120;
   if (place.source === "local") score += 8;
   return score;
+}
+
+function matchesRequestedPlace(place: PlaceMatch, query: string) {
+  const normalizedQuery = normalizePlaceText(query);
+  const normalizedName = normalizePlaceText(place.name);
+  const target = normalizePlaceText(placePath(place));
+  const lastPart = normalizePlaceText(queryParts(query).at(-1) || query);
+  return normalizedQuery.includes(normalizedName) || target.includes(normalizedQuery) || (lastPart.length >= 2 && target.includes(lastPart));
+}
+
+function semanticPlaceKey(place: PlaceMatch) {
+  const region = normalizePlaceText(place.admin1 || place.countryCode || place.country || "");
+  return `${region}:${normalizePlaceText(place.name)}`;
+}
+
+function sourcePriority(place: PlaceMatch) {
+  return place.source === "local" ? 3 : place.source === "arcgis" ? 2 : 1;
+}
+
+export function dedupePlaceMatches(places: PlaceMatch[], query: string) {
+  const bestByPlace = new Map<string, PlaceMatch>();
+  for (const place of places.filter((item) => matchesRequestedPlace(item, query))) {
+    const key = semanticPlaceKey(place);
+    const current = bestByPlace.get(key);
+    if (!current || sourcePriority(place) > sourcePriority(current) || (sourcePriority(place) === sourcePriority(current) && relevance(place, query) > relevance(current, query))) {
+      bestByPlace.set(key, place);
+    }
+  }
+  return [...bestByPlace.values()].sort((left, right) => relevance(right, query) - relevance(left, query));
 }
 
 async function searchOpenMeteo(name: string) {
@@ -152,12 +184,7 @@ export async function GET(request: NextRequest) {
     // The curated local list remains available when the external provider is unavailable.
   }
 
-  const merged = [...local, ...remote].filter((place, index, all) =>
-    all.findIndex((candidate) =>
-      Math.abs(candidate.latitude - place.latitude) < 0.02
-      && Math.abs(candidate.longitude - place.longitude) < 0.02
-    ) === index
-  ).sort((left, right) => relevance(right, query) - relevance(left, query)).slice(0, 12);
+  const merged = dedupePlaceMatches([...local, ...remote], query).slice(0, 12);
   const resolved = await Promise.all(merged.map(resolveTimezone));
 
   return NextResponse.json(
