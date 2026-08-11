@@ -90,11 +90,20 @@ test("personal reports use seven requested modules and Ziwei shows chart only", 
     readFile(new URL("../lib/ai-report.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/measurement-page.tsx", import.meta.url), "utf8"),
   ]);
-  for (const label of ["命盘总览", "事业及财运", "感情及婚姻", "健康", "子女", "父母及兄弟", "运势节奏及关键节点"]) {
+  for (const label of ["命盘总览", "事业及财运", "感情及婚姻", "健康", "子女", "父母及兄弟", "流年运势及关键节点"]) {
     assert.match(reportSource, new RegExp(label));
   }
   assert.match(pageSource, /className="ziwei-chart-only"/);
   assert.doesNotMatch(pageSource, /className="ziwei-analysis"|className="radar-stage"|analysisTabs/);
+});
+
+test("personal reports separate the paid timing module and repeat Guanchen consultation at the bottom", async () => {
+  const source = await readFile(new URL("../app/measurement-page.tsx", import.meta.url), "utf8");
+  assert.match(source, /\/api\/charts\/timing/);
+  assert.match(source, /解锁 · 3 积分/);
+  assert.match(source, /命盘详询 2积分/);
+  assert.match(source, /className="guanchen-bottom-cta"/);
+  assert.doesNotMatch(source, /问这张盘 · 2 积分/);
 });
 
 test("main navigation removes the standalone chart question link", async () => {

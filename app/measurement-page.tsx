@@ -638,6 +638,9 @@ function ZiweiNarrativeReport({ result }: { result: ZiweiChartResult }) {
 
 function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi" | "ziwei" | "compatibility" }) {
   const [activeId, setActiveId] = useState(report.chapters[0]?.id || "overview");
+  const [timingChapter, setTimingChapter] = useState(() => report.chapters.find((chapter) => chapter.id === "timing") ?? null);
+  const [timingLoading, setTimingLoading] = useState(false);
+  const [timingNotice, setTimingNotice] = useState("");
   const [chatQuestion, setChatQuestion] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatElapsed, setChatElapsed] = useState(0);
@@ -645,7 +648,9 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
   const [chatCredits, setChatCredits] = useState(5);
   const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string; actions?: string[] }>>([]);
   const chatActive = activeId === "ai_chat";
-  const active = report.chapters.find((chapter) => chapter.id === activeId) ?? report.chapters[0];
+  const timingLocked = activeId === "timing_unlock";
+  const baseChapters = report.chapters.filter((chapter) => chapter.id !== "timing");
+  const active = [...baseChapters, ...(timingChapter ? [timingChapter] : [])].find((chapter) => chapter.id === activeId) ?? (chatActive || timingLocked ? null : baseChapters[0]);
   const evidenceMap = new Map(report.evidenceCatalog.map((item) => [item.id, item.text]));
 
   useEffect(() => {
@@ -704,7 +709,40 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
       setChatLoading(false);
     }
   }
-  if (!active) return null;
+
+  async function unlockTimingReport() {
+    if (timingLoading || kind === "compatibility") return;
+    if (chatCredits < 3) {
+      setTimingNotice("当前积分不足，解锁流年分析需要 3 积分。");
+      return;
+    }
+    setTimingLoading(true);
+    setTimingNotice("");
+    try {
+      const response = await fetch("/api/charts/timing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, evidenceCatalog: report.evidenceCatalog }),
+      });
+      const data = await response.json() as { chapter?: AiDeepReport["chapters"][number]; message?: string; remainingCredits?: number };
+      if (!response.ok || !data.chapter) throw new Error(data.message || "流年分析暂时无法生成，请稍后重试。");
+      setTimingChapter(data.chapter);
+      setActiveId("timing");
+      if (Number.isFinite(data.remainingCredits)) {
+        setChatCredits(Number(data.remainingCredits));
+        window.dispatchEvent(new CustomEvent("guanchen:credits", { detail: Number(data.remainingCredits) }));
+      }
+    } catch (error) {
+      setTimingNotice(error instanceof Error ? `${error.message} 本次未扣积分。` : "流年分析生成失败，本次未扣积分。");
+    } finally {
+      setTimingLoading(false);
+    }
+  }
+
+  function openGuanchenConsultation() {
+    setActiveId("ai_chat");
+    window.setTimeout(() => document.querySelector(".chart-chat-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
 
   return (
     <section className="ai-deep-report">
@@ -731,10 +769,11 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
       </section>
 
       <nav className="ai-report-tabs" aria-label="观辰深度报告章节">
-        {report.chapters.map((chapter) => (
-          <button type="button" key={chapter.id} className={chapter.id === active.id ? "active" : ""} onClick={() => setActiveId(chapter.id)}>{chapter.title}</button>
+        {baseChapters.map((chapter) => (
+          <button type="button" key={chapter.id} className={chapter.id === active?.id ? "active" : ""} onClick={() => setActiveId(chapter.id)}>{chapter.title}</button>
         ))}
-        <button type="button" className={chatActive ? "active ai-chat-tab" : "ai-chat-tab"} onClick={() => setActiveId("ai_chat")}><span>观辰解析</span><small>问这张盘 · 2 积分</small></button>
+        {kind !== "compatibility" && <button type="button" className={activeId === "timing" || timingLocked ? "active timing-unlock-tab" : "timing-unlock-tab"} onClick={() => setActiveId(timingChapter ? "timing" : "timing_unlock")}><span>流年运势及关键节点</span><small>{timingChapter ? "已解锁" : "解锁 · 3 积分"}</small></button>}
+        <button type="button" className={chatActive ? "active ai-chat-tab" : "ai-chat-tab"} onClick={openGuanchenConsultation}><span>观辰解析</span><small>命盘详询 2积分</small></button>
       </nav>
 
       {chatActive ? (
@@ -755,7 +794,12 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
           {chatLoading && <div className="guanchen-mini-wait" aria-live="polite"><div className="taoist-reader" aria-hidden="true"><i className="taoist-hat" /><i className="taoist-head" /><i className="taoist-robe" /><span className="taoist-book"><b /><em /></span></div><div><b>小道士正在翻阅盘面</b><span>{chatElapsed < 18 ? `预计还需 ${18 - chatElapsed} 秒` : "正在完成最后核对"}</span></div></div>}
           {chatNotice && <p className="chart-chat-notice">{chatNotice}</p>}
         </section>
-      ) : <article className="ai-report-chapter">
+      ) : timingLocked ? <section className="timing-unlock-panel">
+        <div><small>独立流年专题</small><h3>流年运势及关键节点</h3><p>集中分析当前大运、今年及随后两个流年的主题、机会与需要提前准备的关键节点。基础六个模块不重复讨论时间线。</p><ul><li>当前大运的长期环境与核心课题</li><li>当年流年及随后两个流年的变化节奏</li><li>可验证的现实信号与行动建议</li></ul></div>
+        <aside><b>3 积分</b><span>成功生成后扣除</span><button type="button" disabled={timingLoading} onClick={() => void unlockTimingReport()}>{timingLoading ? "正在分析大运流年…" : "解锁流年分析"}</button></aside>
+        {timingLoading && <div className="guanchen-mini-wait"><div className="taoist-reader" aria-hidden="true"><i className="taoist-hat" /><i className="taoist-head" /><i className="taoist-robe" /><span className="taoist-book"><b /><em /></span></div><div><b>正在核对大运与流年</b><span>请保持页面打开，生成失败不会扣积分</span></div></div>}
+        {timingNotice && <p className="chart-chat-notice">{timingNotice}</p>}
+      </section> : active ? <article className="ai-report-chapter">
         <header><small>专题解读</small><h3>{active.title}</h3><h4>{active.headline}</h4></header>
         <div className="ai-narrative">{active.narrative.map((paragraph, index) => <p key={`${active.id}-n-${index}`}>{paragraph}</p>)}</div>
 
@@ -783,12 +827,16 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
           <section><small>用现实验证</small>{active.reflectionQuestions.map((item, index) => <p key={`${active.id}-q-${index}`}>{item}</p>)}</section>
           <section><small>可以马上做</small>{active.actions.map((item, index) => <article key={`${item.horizon}-${index}`}><span>{item.horizon}</span><b>{item.title}</b><p>{item.detail}</p></article>)}</section>
         </div>
-      </article>}
+      </article> : null}
 
       <footer className="ai-report-footer">
         <section><small>综合收束</small>{report.finalSynthesis.map((item, index) => <p key={`s-${index}`}>{item}</p>)}</section>
         <section><small>分析边界</small><ul>{report.boundaries.map((item, index) => <li key={`b-${index}`}>{item}</li>)}</ul></section>
       </footer>
+      <section className="guanchen-bottom-cta">
+        <div><small>看完报告，还有具体问题？</small><h3>把现实处境告诉观辰，再沿着这张命盘深入分析。</h3><p>事业选择、关系互动、关键决定都可以继续问；每次回答 400—600 字，成功后扣 2 积分。</p></div>
+        <button type="button" onClick={openGuanchenConsultation}><span>观辰解析</span><small>命盘详询 2积分</small></button>
+      </section>
     </section>
   );
 }

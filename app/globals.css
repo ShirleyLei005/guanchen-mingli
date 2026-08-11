@@ -664,8 +664,13 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .ai-report-tabs { display: flex; padding: 0 38px; overflow-x: auto; border-bottom: 1px solid #dcd0bc; background: #f1e8d9; scrollbar-width: none; }
 .ai-report-tabs button { flex: 0 0 auto; padding: 20px 22px; color: #707872; background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; font-size: 15px; }
 .ai-report-tabs button.active { color: #173d32; border-bottom-color: #b88b4b; font-weight: 700; }
-.ai-report-tabs .ai-chat-tab { position: sticky; right: 0; z-index: 3; display: grid; gap: 3px; margin-left: auto; min-width: 178px; padding: 13px 22px; color: #fff; background: #1d493b; border-left: 1px solid #d0ad69; border-bottom-color: #d0ad69; box-shadow: -14px 0 24px rgba(42,53,47,.15); font-weight: 700; letter-spacing: .06em; animation: guanchen-tab-glow 2.8s ease-in-out infinite; }
-.ai-report-tabs .ai-chat-tab::before { content: "✦"; margin-right: 8px; color: #e0bd76; }
+.ai-report-tabs .timing-unlock-tab { display: grid; gap: 3px; color: #6f562c; background: #ead9b8; border-left: 1px solid #cfad70; border-right: 1px solid #cfad70; }
+.ai-report-tabs .timing-unlock-tab span { font-size: 14px; }
+.ai-report-tabs .timing-unlock-tab small { color: #956a2f; font-size: 10px; }
+.ai-report-tabs .timing-unlock-tab.active { color: #fff; background: #8d6734; }
+.ai-report-tabs .timing-unlock-tab.active small { color: #f4dfb5; }
+.ai-report-tabs .ai-chat-tab { position: sticky; right: 8px; z-index: 3; display: grid; gap: 3px; margin: 7px 8px 7px auto; min-width: 190px; padding: 11px 22px 11px 46px; color: #fff; background: linear-gradient(120deg,#143e32,#2f6251); border: 1px solid #d0ad69; border-radius: 8px; box-shadow: -14px 0 24px rgba(42,53,47,.15); font-weight: 700; letter-spacing: .06em; text-align: left; animation: guanchen-tab-glow 2.8s ease-in-out infinite; }
+.ai-report-tabs .ai-chat-tab::before { content: "✦"; position: absolute; left: 18px; top: 50%; color: #e0bd76; font-size: 18px; transform: translateY(-50%); }
 .ai-report-tabs .ai-chat-tab span { font-size: 16px; }
 .ai-report-tabs .ai-chat-tab small { color: #dfc98f; font-size: 10px; letter-spacing: 0; }
 .ai-report-tabs .ai-chat-tab:hover, .ai-report-tabs .ai-chat-tab.active { color: #173d32; background: #dfbd7c; border-bottom-color: #173d32; }
@@ -693,6 +698,16 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .chart-chat-compose button { min-width: 190px; padding: 0 24px; color: #fff; background: #21493d; border: 0; cursor: pointer; font-weight: 700; }
 .chart-chat-compose button:disabled { cursor: wait; opacity: .55; }
 .chart-chat-notice { margin: 14px 0 0; color: #9a4d3f; font: 13px/1.7 system-ui,sans-serif; }
+.timing-unlock-panel { display: grid; grid-template-columns: minmax(0,1fr) 250px; gap: 38px; padding: 58px; background: linear-gradient(135deg,#fbf6ed,#efe1c8); border-top: 4px solid #b88b4b; }
+.timing-unlock-panel > div > small { color: #a87536; font: 700 12px/1.5 system-ui,sans-serif; letter-spacing: .08em; }
+.timing-unlock-panel h3 { margin: 14px 0 16px; color: #173d32; font-size: clamp(30px,3vw,44px); font-weight: 400; }
+.timing-unlock-panel p,.timing-unlock-panel li { color: #59645e; font: 15px/1.9 system-ui,sans-serif; }
+.timing-unlock-panel ul { padding-left: 20px; }
+.timing-unlock-panel aside { display: grid; align-content: center; gap: 8px; padding: 28px; color: #fff; background: #21493d; text-align: center; }
+.timing-unlock-panel aside b { color: #e4c783; font-size: 32px; font-weight: 400; }
+.timing-unlock-panel aside span { color: #b9c7c1; font: 12px/1.5 system-ui,sans-serif; }
+.timing-unlock-panel aside button { margin-top: 12px; padding: 14px 18px; color: #173d32; background: #e2c17e; border: 0; cursor: pointer; font-weight: 700; }
+.timing-unlock-panel > .guanchen-mini-wait,.timing-unlock-panel > .chart-chat-notice { grid-column: 1/-1; margin: 0; }
 .guanchen-mini-wait { display: flex; align-items: center; gap: 18px; margin-top: 16px; padding: 16px 20px; color: #23473c; background: #eee5d5; border: 1px solid #d7c8ad; }
 .guanchen-mini-wait > div:last-child { display: grid; gap: 5px; }
 .guanchen-mini-wait b { font: 700 14px/1.5 system-ui,sans-serif; }
@@ -745,6 +760,13 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .ai-report-footer { display: grid; grid-template-columns: 1.3fr .7fr; gap: 34px; padding: 42px 54px; background: #eee5d5; }
 .ai-report-footer p, .ai-report-footer li { color: #53605a; font: 15px/2 system-ui,sans-serif; }
 .ai-report-footer ul { margin: 14px 0 0; padding-left: 18px; }
+.guanchen-bottom-cta { display: flex; align-items: center; justify-content: space-between; gap: 38px; padding: 42px 54px; color: #fff; background: linear-gradient(120deg,#143d31,#285746); border-top: 1px solid #d2af69; }
+.guanchen-bottom-cta small { color: #dfbd7c; font: 700 11px/1.5 system-ui,sans-serif; letter-spacing: .08em; }
+.guanchen-bottom-cta h3 { margin: 10px 0 7px; color: #fff; font-size: 24px; font-weight: 400; }
+.guanchen-bottom-cta p { margin: 0; color: #becdc7; font: 14px/1.8 system-ui,sans-serif; }
+.guanchen-bottom-cta button { flex: 0 0 210px; display: grid; gap: 5px; padding: 17px 24px; color: #173d32; background: #e1bf79; border: 1px solid #f0d99f; cursor: pointer; box-shadow: 0 12px 30px rgba(0,0,0,.18); }
+.guanchen-bottom-cta button span { font-size: 19px; font-weight: 700; }
+.guanchen-bottom-cta button small { color: #685229; letter-spacing: 0; }
 .report-summary small, .report-topics article > small { color: #9f7642; font: 700 9px/1 system-ui, sans-serif; letter-spacing: .12em; }
 .report-summary h3 { margin: 12px 0 18px; font-size: 23px; font-weight: 400; line-height: 1.65; }
 .report-summary ul { margin: 0; padding-left: 19px; color: #66706b; font: 12px/1.9 system-ui, sans-serif; }
@@ -943,6 +965,9 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
   .chart-chat-compose { grid-template-columns: 1fr; }
   .chart-chat-compose button { min-height: 54px; }
   .chart-chat-messages > article { max-width: 100%; }
+  .timing-unlock-panel { grid-template-columns: 1fr; padding: 34px 22px; }
+  .guanchen-bottom-cta { align-items: stretch; flex-direction: column; padding: 34px 22px; }
+  .guanchen-bottom-cta button { flex-basis: auto; }
   .reading-timing h4 { min-height: 0; }
   .report-output { padding: 22px 16px; }
 }

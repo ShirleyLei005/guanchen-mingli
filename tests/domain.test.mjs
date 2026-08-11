@@ -8,6 +8,7 @@ test("commercial constants are wired into the source", async () => {
   assert.match(source, /bazi_report:\s*5/);
   assert.match(source, /ziwei_report:\s*5/);
   assert.match(source, /compatibility:\s*10/);
+  assert.match(source, /timing_report:\s*3/);
   assert.match(source, /conversation_message:\s*2/);
   assert.match(source, /priceFen:\s*990/);
   assert.match(source, /priceFen:\s*3900/);

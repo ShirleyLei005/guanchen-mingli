@@ -2,6 +2,7 @@ export const PRODUCT_COSTS = {
   bazi_report: 5,
   ziwei_report: 5,
   compatibility: 10,
+  timing_report: 3,
   conversation_message: 2,
 } as const;
 

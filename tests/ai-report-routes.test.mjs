@@ -8,14 +8,14 @@ function mockReport(kind) {
   const timingRef = kind === "bazi" ? "B050" : kind === "ziwei" ? "Z030" : "C050";
   const chapters = kind === "compatibility"
     ? [["overview", "关系总览"], ["communication", "沟通模式"], ["intimacy", "亲密需求"], ["conflict", "冲突修复"], ["cooperation", "现实协作"], ["growth", "共同成长"]]
-    : [["overview", "命盘总览"], ["career_wealth", "事业及财运"], ["relationships", "感情及婚姻"], ["health", "健康"], ["children", "子女"], ["family", "父母及兄弟"], ["timing", "运势节奏及关键节点"]];
+    : [["overview", "命盘总览"], ["career_wealth", "事业及财运"], ["relationships", "感情及婚姻"], ["health", "健康"], ["children", "子女"], ["family", "父母及兄弟"], ["timing", "流年运势及关键节点"]];
   return {
     title: kind === "compatibility" ? "看见彼此的互动方式，也保留共同选择" : "在趋势中辨认课题，在选择中塑造人生",
     directAnswer: kind === "compatibility" ? `第一方与第二方需要把盘面倾向放回真实互动中验证。${paragraph}` : paragraph,
     coreConclusions: [
       { title: "结构主轴", conclusion: paragraph, evidenceRefs: refs },
       { title: "现实表达", conclusion: paragraph, evidenceRefs: refs },
-      { title: "阶段准备", conclusion: paragraph, evidenceRefs: [timingRef] },
+      { title: "行动准备", conclusion: paragraph, evidenceRefs: refs },
     ],
     chapters: chapters.map(([id, title]) => ({
       id, title, headline: `${title}：从盘面趋势回到现实选择`,
@@ -80,6 +80,7 @@ async function call(worker, path, body, credits = 1000) {
 
 test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSeek reports", async () => {
   const worker = await getWorkerWithDeepSeekMock();
+  let baziReport;
   const cases = [
     ["/api/charts/bazi", { trueSolarTime: "2000-01-01T12:00:00", gender: "male", topics: ["综合看看"], notes: "虚构测试样本", deepReport: true }],
     ["/api/charts/ziwei", { trueSolarTime: "2000-01-01T12:00:00", gender: "male", topics: ["命盘总览"], notes: "虚构测试样本", deepReport: true }],
@@ -91,13 +92,15 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
     const result = await response.json();
     assert.equal(result.aiReport.provider, "deepseek");
     assert.equal(result.aiReport.model, "deepseek-v4-flash");
-    assert.equal(result.aiReport.chapters.length, path.includes("compatibility") ? 6 : 7);
+    assert.equal(result.aiReport.chapters.length, 6);
     assert.equal(result.creditCost, path.includes("compatibility") ? 10 : 5);
     assert.equal(result.creditBalance, path.includes("compatibility") ? 990 : 995);
     assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.length === (path.includes("compatibility") ? 2 : 4)), true);
     if (!path.includes("compatibility")) {
-      assert.equal(result.aiReport.chapters.every((chapter) => chapter.timing.length === 4), true);
-      assert.equal(result.aiReport.chapters.every((chapter) => chapter.timing.slice(1).every((item) => /流年/.test(item.period))), true);
+      assert.equal(result.aiReport.chapters.every((chapter) => chapter.timing.length === 0), true);
+      assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.join("").length <= 400), true);
+      assert.equal(result.aiReport.chapters.some((chapter) => chapter.id === "timing"), false);
+      if (path.includes("/bazi")) baziReport = result.aiReport;
     }
     const valid = new Set(result.aiReport.evidenceCatalog.map((item) => item.id));
     const cited = result.aiReport.chapters.flatMap((chapter) => [...chapter.evidenceRefs, ...chapter.timing.flatMap((item) => item.evidenceRefs)]);
@@ -109,6 +112,16 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
       assert.doesNotMatch(result.aiReport.directAnswer, /第一方|第二方/);
     }
   }
+
+  const timingResponse = await call(worker, "/api/charts/timing", { kind: "bazi", evidenceCatalog: baziReport.evidenceCatalog }, 100);
+  assert.equal(timingResponse.status, 200);
+  const timing = await timingResponse.json();
+  assert.equal(timing.creditCost, 3);
+  assert.equal(timing.remainingCredits, 97);
+  assert.equal(timing.chapter.id, "timing");
+  assert.equal(timing.chapter.title, "流年运势及关键节点");
+  assert.equal(timing.chapter.timing.length, 4);
+  assert.ok(timing.chapter.narrative.join("").length <= 600);
 });
 
 test("new test registrations receive five credits without resetting an existing balance", async () => {
