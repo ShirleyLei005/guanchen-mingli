@@ -13,8 +13,9 @@ export default function LoginPage() {
       <SiteHeader />
       <section className="login-shell">
         <div className="login-value">
-          <p>YOUR CHART, CONTINUED</p>
-          <h1>保存一张命盘，<br />持续理解同一个人生。</h1>
+          <p>观天时 · 察人事 · 知进退</p>
+          <h1>解码东方智慧，<br />洞见人生起伏。</h1>
+          <span>以八字观人生格局，以紫微察十二宫垣。注册观辰，保存命盘与报告，让每一份洞察都回到现实选择。</span>
           <ul><li>保存出生档案与真太阳时校正结果</li><li>新用户注册免费获赠 5 积分</li><li>查看历史报告并基于固定命盘追问</li></ul>
         </div>
         <LoginCard />

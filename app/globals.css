@@ -859,6 +859,7 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .login-shell { min-height: 700px; display: grid; grid-template-columns: 1fr 1fr; }
 .login-value { padding: 110px 8vw; color: #fff; background: var(--pine-dark); }
 .login-value h1 { margin: 0; font-size: clamp(44px, 5vw, 68px); font-weight: 400; line-height: 1.35; }
+.login-value > span { display: block; max-width: 620px; margin-top: 24px; color: rgba(255,255,255,.72); font-size: 15px; line-height: 1.9; }
 .login-value ul { margin-top: 50px; padding-left: 20px; color: rgba(255,255,255,.68); line-height: 2.3; }
 .login-card { padding: 100px 8vw; background: #fffdf8; }
 .login-card > p { color: var(--gold); font: 700 10px/1 system-ui, sans-serif; letter-spacing: .18em; }

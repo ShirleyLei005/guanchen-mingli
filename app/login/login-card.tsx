@@ -46,8 +46,8 @@ export function LoginCard() {
   if (success) {
     return (
       <form className="login-card login-success" onSubmit={(event) => event.preventDefault()}>
-        <p>WELCOME</p>
-        <h2>{success.isNew ? "注册成功，礼遇已到账" : "欢迎回来"}</h2>
+        <p>观辰 · 礼遇已至</p>
+        <h2>{success.isNew ? "注册功成，礼遇已到账" : "故人重逢，命盘依旧"}</h2>
         <div className="gift-banner">
           <b>5 积分</b>
           <span>{success.isNew ? "新用户礼遇已到账，可用于解锁八字或紫微斗数完整报告。" : `当前积分余额 ${success.credits}。`}</span>
@@ -60,7 +60,7 @@ export function LoginCard() {
 
   return (
     <form className="login-card" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-      <p>MEMBER ACCESS</p>
+      <p>观辰 · 会员之门</p>
       <h2>{mode === "register" ? "注册观辰" : "登录观辰"}</h2>
       <div className="auth-tabs">
         <button type="button" className={mode === "register" ? "selected" : ""} onClick={() => { setMode("register"); setNotice(""); }}>新用户注册</button>
