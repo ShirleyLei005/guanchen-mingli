@@ -78,7 +78,7 @@ test("birthplace uses an editable country-province-prefecture-district hierarchy
   assert.match(home, /<PlaceHierarchyPicker/);
 });
 
-test("measurement UX includes a visible wait state and full compatibility scope", async () => {
+test("measurement UX includes a visible wait state without the redundant compatibility scope card", async () => {
   const [source, waitSource] = await Promise.all([
     readFile(new URL("../app/measurement-page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/guanchen-wait.tsx", import.meta.url), "utf8"),
@@ -86,8 +86,7 @@ test("measurement UX includes a visible wait state and full compatibility scope"
   assert.match(waitSource, /预计还需/);
   assert.match(waitSource, /taoist-reader/);
   assert.match(source, /小道士正在翻阅盘面/);
-  assert.match(source, /无需选择方向，默认进行全维度合盘解析/);
-  assert.match(source, /完整覆盖八项关系主题/);
+  assert.doesNotMatch(source, /className="match-full-scope"|无需选择方向，默认进行全维度合盘解析/);
   assert.match(source, /小道士正在翻阅盘面/);
   assert.match(source, /400—600 字/);
   assert.match(source, /请观辰解析 · 2 积分/);

@@ -195,13 +195,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
         <BirthFields label={kind === "match" ? "第一方资料" : undefined} onChange={updatePrimary} />
         {kind === "match" && <BirthFields label="第二方资料" defaultPlace="成都" onChange={updateSecondary} />}
 
-        {kind === "match" ? (
-          <section className="match-full-scope" aria-label="合盘完整分析范围">
-            <small>10 积分完整报告</small>
-            <h3>无需选择方向，默认进行全维度合盘解析</h3>
-            <p>报告将完整覆盖关系总览、沟通方式、情感需求、冲突修复、长期发展、家庭协作、共同成长与现实建议。</p>
-          </section>
-        ) : (
+        {kind !== "match" && (
           <fieldset className="birth-fieldset topic-fieldset">
             <legend>本次重点方向</legend>
             <p>最多选择 3 项，完整报告会围绕所选课题组织。</p>

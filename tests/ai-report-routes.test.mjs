@@ -103,7 +103,8 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
     assert.equal(result.aiReport.chapters.length, 6);
     assert.equal(result.creditCost, path.includes("compatibility") ? 10 : 5);
     assert.equal(result.creditBalance, path.includes("compatibility") ? 990 : 995);
-    assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.length === (path.includes("compatibility") ? 2 : 4)), true);
+    assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.length === 4), true);
+    assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.every((paragraph) => /[。！？]$/.test(paragraph))), true);
     if (!path.includes("compatibility")) {
       assert.equal(result.aiReport.chapters.every((chapter) => chapter.timing.length === 0), true);
       assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.join("").length <= 400), true);
@@ -116,8 +117,8 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
     const cited = result.aiReport.chapters.flatMap((chapter) => [...chapter.evidenceRefs, ...chapter.timing.flatMap((item) => item.evidenceRefs)]);
     assert.equal(cited.every((id) => valid.has(id)), true);
     if (path.includes("compatibility")) {
-      const narrativeLength = result.aiReport.chapters.flatMap((chapter) => chapter.narrative).join("").length;
-      assert.ok(narrativeLength >= 1000 && narrativeLength <= 1200);
+      assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.join("").length >= 400), true);
+      assert.equal(result.aiReport.chapters.every((chapter) => /[。！？]$/.test(chapter.narrative.at(-1))), true, JSON.stringify(result.aiReport.chapters.map((chapter) => chapter.narrative.at(-1))));
       assert.match(result.aiReport.directAnswer, /子安与清和/);
       assert.doesNotMatch(result.aiReport.directAnswer, /第一方|第二方/);
     }
@@ -133,6 +134,7 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
   assert.equal(timing.chapter.timing.length, 4);
   assert.ok(timing.chapter.narrative.join("").length <= 600);
   assert.equal(timing.chapter.narrative.every((paragraph) => paragraph.length >= 100 && paragraph.length <= 145), true);
+  assert.equal(timing.chapter.narrative.every((paragraph) => /[。！？]$/.test(paragraph)), true);
 });
 
 test("new test registrations receive five credits without resetting an existing balance", async () => {

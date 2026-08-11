@@ -108,11 +108,15 @@ function ensureTextRange(text: string, minLength: number, maxLength: number, sup
     if (result && !/[。！？；]$/.test(result)) result += "。";
     result += neutral;
   }
-  if (result.length <= maxLength) return result;
+  if (result.length <= maxLength) return /[。！？]$/.test(result) ? result : `${result.replace(/[，、；：\s]+$/, "")}。`;
   const slice = result.slice(0, maxLength);
-  const cut = Math.max(slice.lastIndexOf("。"), slice.lastIndexOf("！"), slice.lastIndexOf("？"));
-  if (cut + 1 >= minLength) return slice.slice(0, cut + 1);
-  return `${slice.slice(0, Math.max(minLength, maxLength - 1)).replace(/[，、；：\s]+$/, "")}。`;
+  const sentenceCut = Math.max(slice.lastIndexOf("。"), slice.lastIndexOf("！"), slice.lastIndexOf("？"));
+  if (sentenceCut + 1 >= minLength) return slice.slice(0, sentenceCut + 1);
+  const clauseCut = Math.max(slice.lastIndexOf("；"), slice.lastIndexOf("，"), slice.lastIndexOf("："));
+  if (clauseCut + 1 >= minLength) return `${slice.slice(0, clauseCut).replace(/[，、；：\s]+$/, "")}。`;
+  const nextSentence = result.slice(maxLength, maxLength + 50).search(/[。！？]/);
+  if (nextSentence >= 0) return result.slice(0, maxLength + nextSentence + 1);
+  return /[。！？]$/.test(result) ? result : `${result.replace(/[，、；：\s]+$/, "")}。`;
 }
 
 const CHAPTER_SUPPLEMENTS: Record<string, string[]> = {
@@ -158,11 +162,11 @@ const CHAPTER_SUPPLEMENTS: Record<string, string[]> = {
     "随后年份的意义在于帮助提前安排资源与节奏，而不是把某个年份解释成一定会发生的具体事件。",
     "可为每个阶段设定一个观察信号、一个准备动作和一个复盘节点，让时间分析真正服务于选择。",
   ],
-  communication: ["沟通模式要看双方如何表达需求、接收信息和处理分歧，并以真实互动检验盘面所示倾向。", "关系稳定依赖双方都能听见事实与感受，而不是猜测对方意图或用沉默代替回应。"],
-  intimacy: ["亲密需求需要同时考虑靠近、独处、安全感和承诺方式，差异本身不等于关系不合。", "把期待说成具体请求，并给彼此回应和协商的空间，更容易形成可持续的亲密感。"],
-  conflict: ["冲突分析关注触发点、升级路径和修复能力，不用一次争执定义整段关系。", "双方若能暂停指责、确认事实并约定下一步，摩擦更可能转化为理解和共同规则。"],
-  cooperation: ["现实协作要落到时间、金钱、家务、事业和家庭责任的分配，不能只讨论抽象感受。", "清楚分工并定期复盘，比默认一方持续迁就更能保护关系的长期稳定。"],
-  growth: ["共同成长不是要求两个人保持同一步速，而是能看见彼此阶段差异并协商可以同行的方式。", "关系是否有韧性，要由长期行动、边界尊重和遇到问题后的修复结果共同验证。"],
+  communication: ["沟通模式要看双方如何表达需求、接收信息和处理分歧，并以真实互动检验盘面所示倾向。", "关系稳定依赖双方都能听见事实与感受，而不是猜测对方意图或用沉默代替回应。", "出现理解偏差时，先复述对方意思并确认事实，再讨论感受和方案，能够减少防御与误判。", "可约定固定的沟通时间和暂停规则，用几次真实对话观察双方是否更容易恢复连接。"],
+  intimacy: ["亲密需求需要同时考虑靠近、独处、安全感和承诺方式，差异本身不等于关系不合。", "把期待说成具体请求，并给彼此回应和协商的空间，更容易形成可持续的亲密感。", "当一方需要确认、另一方需要缓冲时，提前说明各自节奏可以避免把差异误解为冷淡或控制。", "可从陪伴频率、个人空间和表达方式三个方面建立共识，并根据实际感受逐步调整。"],
+  conflict: ["冲突分析关注触发点、升级路径和修复能力，不用一次争执定义整段关系。", "双方若能暂停指责、确认事实并约定下一步，摩擦更可能转化为理解和共同规则。", "需要区分当下事件和长期积累的问题，避免翻旧账或用绝对化语言扩大原本可以处理的分歧。", "建议在情绪稳定后复盘触发点、各自需求和下一次替代做法，观察修复是否真正发生。"],
+  cooperation: ["现实协作要落到时间、金钱、家务、事业和家庭责任的分配，不能只讨论抽象感受。", "清楚分工并定期复盘，比默认一方持续迁就更能保护关系的长期稳定。", "面对资源有限或计划变化时，双方需要公开优先级和承受范围，避免责任长期向一方倾斜。", "可以把共同事项写成具体安排，约定负责人、完成时间和调整方式，再根据执行结果优化分工。"],
+  growth: ["共同成长不是要求两个人保持同一步速，而是能看见彼此阶段差异并协商可以同行的方式。", "关系是否有韧性，要由长期行动、边界尊重和遇到问题后的修复结果共同验证。", "当个人目标发生变化时，及时说明新的需求和可能影响，可以减少对方被突然改变计划的感受。", "建议每隔一段时间回顾共同目标、个人空间和现实压力，确认双方仍愿意投入的具体行动。"],
 };
 
 function normalizeNarrative(narrative: string[], target = 4) {
@@ -248,13 +252,13 @@ function normalizeGeneratedReport(report: GeneratedReport, catalog: EvidenceItem
     chapter.title = sanitizePublicText(chapter.title);
     chapter.headline = sanitizePublicText(chapter.headline);
     if (Array.isArray(chapter?.narrative)) {
-      const target = kind === "compatibility" ? 2 : 4;
+      const target = 4;
       chapter.narrative = normalizeNarrative(chapter.narrative, target);
       const supplements = CHAPTER_SUPPLEMENTS[chapter.id] || CHAPTER_SUPPLEMENTS.overview;
       while (chapter.narrative.length < target) chapter.narrative.push("");
       chapter.narrative = chapter.narrative.slice(0, target).map((paragraph, index) => {
-        const min = kind === "compatibility" ? 85 : chapter.id === "timing" ? 100 : 65;
-        const max = kind === "compatibility" ? 100 : chapter.id === "timing" ? 145 : 95;
+        const min = kind === "compatibility" ? 100 : chapter.id === "timing" ? 100 : 65;
+        const max = kind === "compatibility" ? 145 : chapter.id === "timing" ? 145 : 95;
         const fact = catalog.find((item) => chapter.evidenceRefs.includes(item.id))?.text || "";
         return ensureTextRange(paragraph, min, max, [supplements[index % supplements.length], fact]);
       });
@@ -394,7 +398,7 @@ function systemInstructions(kind: ReportKind, chapterIds = REQUIRED_CHAPTERS[kin
     ? "chapters 必须且只能包含 id 为 overview、communication、intimacy、conflict、cooperation、growth 的六章，完整覆盖沟通、亲密、冲突修复、现实协作和共同成长，不得省略，也不要增加其他章节。"
     : `chapters 只能包含本次指定的章节：${chapterIds.join("、")}。健康章只讨论生活方式、压力反应和一般性保养提醒；子女、婚姻及家庭章不得断言必有、必无或确定事件。除 timing 章外，任何章节都不得分析大运、流年或输出阶段与时间线。`;
   const narrativeRule = kind === "compatibility"
-    ? "每章 narrative 正好两段，每段85至100个汉字；六章正文合计控制在1000至1200个汉字。第一段说明关系结构与现实表现，第二段解释双方互动依据、调整方法与可验证信号。"
+    ? "每章 narrative 正好四段，每段105至140个汉字，每个模块正文不少于400字。第一段说明关系结构，第二段交叉解释双方依据，第三段给出具体生活场景，第四段说明调整方法与可验证信号。必须写完完整句子，不能用省略号代替后文，也不能在句子中途停止。"
     : "非 timing 章节 narrative 正好四段，每段65至95个汉字，四段合计不得超过400字；timing 章节 narrative 正好四段，每段100至145个汉字，合计不得超过600字。第一段说明含义，第二段交叉解释依据，第三段给出具体表现，第四段说明验证与运用。";
   const timingScope = kind !== "compatibility" && !chapterIds.includes("timing")
     ? "本次是5积分基础报告，directAnswer、coreConclusions、chapters 与 finalSynthesis 都不得分析大运、流年、具体年份或关键时间节点，也不得引用运限类证据；这些内容保留给独立流年专题。"
@@ -455,7 +459,7 @@ function validateReport(report: GeneratedReport, catalog: EvidenceItem[], kind: 
   }
   for (const id of requiredChapters) if (!report.chapters.some((chapter) => chapter.id === id)) errors.push(`缺少章节：${id}`);
   report.chapters.forEach((chapter) => {
-    const expectedParagraphs = kind === "compatibility" ? 2 : 4;
+    const expectedParagraphs = 4;
     if (chapter.narrative.length !== expectedParagraphs) errors.push(`${chapter.id}章节段落数量不完整`);
     const narrativeLength = chapter.narrative.join("").length;
     if (narrativeLength === 0) errors.push(`${chapter.id}章节正文缺失`);
@@ -532,8 +536,8 @@ async function requestDeepSeekReport(args: {
     }),
     ...args.chapterIds.map((id) => () => callDeepSeekJson({
       apiKey, model, maxTokens: 3000,
-      system: `${systemInstructions(args.kind, args.chapterIds)}\n本次忽略整份 chapters 数组的格式要求，只生成“${chapterTitles[id]}”一个章节对象。id 必须为 ${id}；${args.kind === "compatibility" ? "narrative 正好2段，每段85至100字" : id === "timing" ? "narrative 正好4段，每段100至145字，合计不超过600字" : "narrative 正好4段，每段65至95字，合计不超过400字"}，并包含具体生活场景；evidenceRefs 2至3项；evidenceExplanation 正好2至3项；${args.kind === "compatibility" ? "timing 最多1项" : id === "timing" ? "timing 正好4项，依次分析当前大运、当年流年及随后两个流年，每项必须引用对应运限证据" : "timing 必须为空数组，不得讨论大运或流年"}；reflectionQuestions 正好2项；actions 正好2项。只返回合法 JSON。`,
-      user: { ...context, chapterId: id, chapterTitle: chapterTitles[id], requiredJsonShape: { id, title: chapterTitles[id], headline: "本章核心判断", narrative: args.kind === "compatibility" ? ["关系结构、现实表现与具体场景", "双方互动依据、调整方法与验证信号"] : ["含义", "依据", "具体表现", "验证与运用"], evidenceRefs: ["有效证据编号1", "有效证据编号2"], evidenceExplanation: ["推导说明1", "推导说明2"], constructiveExpression: "更容易发挥的关系条件", pressureExpression: "需要共同调整的互动方式", timing: [{ period: "证据明确的阶段", theme: "主题", evidenceRefs: ["有效证据编号"], opportunity: "可把握", caution: "需留意" }], reflectionQuestions: ["问题1", "问题2"], actions: [{ horizon: "时间范围", title: "行动", detail: "步骤与观察信号" }, { horizon: "时间范围", title: "行动", detail: "步骤与复盘方式" }] } },
+      system: `${systemInstructions(args.kind, args.chapterIds)}\n本次忽略整份 chapters 数组的格式要求，只生成“${chapterTitles[id]}”一个章节对象。id 必须为 ${id}；${args.kind === "compatibility" ? "narrative 正好4段，每段105至140字，每个模块正文不少于400字，所有句子必须完整收束" : id === "timing" ? "narrative 正好4段，每段100至145字，合计不超过600字" : "narrative 正好4段，每段65至95字，合计不超过400字"}，并包含具体生活场景；evidenceRefs 2至3项；evidenceExplanation 正好2至3项；${args.kind === "compatibility" ? "timing 最多1项" : id === "timing" ? "timing 正好4项，依次分析当前大运、当年流年及随后两个流年，每项必须引用对应运限证据" : "timing 必须为空数组，不得讨论大运或流年"}；reflectionQuestions 正好2项；actions 正好2项。只返回合法 JSON。`,
+      user: { ...context, chapterId: id, chapterTitle: chapterTitles[id], requiredJsonShape: { id, title: chapterTitles[id], headline: "本章核心判断", narrative: args.kind === "compatibility" ? ["关系结构", "双方依据", "具体生活场景", "调整方法与验证信号"] : ["含义", "依据", "具体表现", "验证与运用"], evidenceRefs: ["有效证据编号1", "有效证据编号2"], evidenceExplanation: ["推导说明1", "推导说明2"], constructiveExpression: "更容易发挥的关系条件", pressureExpression: "需要共同调整的互动方式", timing: [{ period: "证据明确的阶段", theme: "主题", evidenceRefs: ["有效证据编号"], opportunity: "可把握", caution: "需留意" }], reflectionQuestions: ["问题1", "问题2"], actions: [{ horizon: "时间范围", title: "行动", detail: "步骤与观察信号" }, { horizon: "时间范围", title: "行动", detail: "步骤与复盘方式" }] } },
     })),
   ];
   const outputs: unknown[] = [];
@@ -638,7 +642,7 @@ async function requestSiliconFlowReport(args: {
     }),
     ...args.chapterIds.map((id) => () => callSiliconFlowJson({
       apiKey, model, maxTokens: 3000,
-      system: `${systemInstructions(args.kind, args.chapterIds)}\n本次只生成“${chapterTitles[id]}”一个章节，id 必须严格为 ${id}。${args.kind === "compatibility" ? "narrative 正好2段，每段85至100个汉字" : id === "timing" ? "narrative 正好4段，每段100至145字，合计不超过600字" : "narrative 正好4段，每段65至95字，合计不超过400字"}；evidenceRefs 正好2至3项且必须有效；evidenceExplanation 正好2项；${args.kind === "compatibility" ? "timing 最多1项" : id === "timing" ? "timing 正好4项，依次分析当前大运、当年流年及随后两个流年，每项引用对应证据" : "timing 必须为空数组"}；reflectionQuestions 正好2项；actions 正好2项。正向表达、压力表达和行动建议均须具体。只返回合法 JSON。`,
+      system: `${systemInstructions(args.kind, args.chapterIds)}\n本次只生成“${chapterTitles[id]}”一个章节，id 必须严格为 ${id}。${args.kind === "compatibility" ? "narrative 正好4段，每段105至140个汉字，每个模块正文不少于400字，所有句子必须完整收束" : id === "timing" ? "narrative 正好4段，每段100至145字，合计不超过600字" : "narrative 正好4段，每段65至95字，合计不超过400字"}；evidenceRefs 正好2至3项且必须有效；evidenceExplanation 正好2项；${args.kind === "compatibility" ? "timing 最多1项" : id === "timing" ? "timing 正好4项，依次分析当前大运、当年流年及随后两个流年，每项引用对应证据" : "timing 必须为空数组"}；reflectionQuestions 正好2项；actions 正好2项。正向表达、压力表达和行动建议均须具体。只返回合法 JSON。`,
       user: {
         ...baseContext,
         chapterId: id,

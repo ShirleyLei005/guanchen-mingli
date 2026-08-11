@@ -353,10 +353,6 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .measure-topics button.selected { color: #fff; background: var(--pine); border-color: var(--pine); }
 .topic-status { display: flex; justify-content: space-between; margin-top: 17px; color: #78807b; font: 11px/1 system-ui, sans-serif; }
 .topic-status button { border: 0; background: transparent; color: var(--jade); cursor: pointer; }
-.match-full-scope { margin-top: 34px; padding: 28px 30px; border: 1px solid rgba(63,120,99,.28); background: linear-gradient(135deg,#eff5f1,#f8f2e7); }
-.match-full-scope small { color: #9b6d35; font: 700 10px/1.5 system-ui,sans-serif; letter-spacing: .12em; }
-.match-full-scope h3 { margin: 12px 0 8px; color: var(--pine); font-size: 21px; font-weight: 500; }
-.match-full-scope p { max-width: 850px; margin: 0; color: #69736e; font: 12px/1.85 system-ui,sans-serif; }
 .birth-fieldset textarea { min-height: 130px; }
 .measure-consent { display: flex !important; align-items: flex-start; gap: 9px; color: #747d78; font-weight: 400 !important; }
 .measure-consent input { width: auto; margin: 3px 0 0; }
