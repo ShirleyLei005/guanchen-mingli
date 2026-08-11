@@ -782,7 +782,7 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
 
         {active.timing.length > 0 && (
           <section className="ai-timing-section">
-            <header><small>阶段与时间线</small><p>时间只表示议题与环境的变化窗口，不承诺具体事件。</p></header>
+            <header><small>{kind === "compatibility" ? "双方大限与流年节奏" : "阶段与时间线"}</small><p>{kind === "compatibility" ? "结合两人当前大限与近三年流年，观察关系议题、情绪需要与现实协作的变化。" : "时间只表示议题与环境的变化窗口，不承诺具体事件。"}</p></header>
             <div>{active.timing.map((item, index) => (
               <article key={`${item.period}-${index}`}><b>{item.period}</b><h4>{item.theme}</h4><p><em>可把握</em>{item.opportunity}</p><p><em>需留意</em>{item.caution}</p><EvidenceFacts refs={item.evidenceRefs} evidenceMap={evidenceMap} compact /></article>
             ))}</div>

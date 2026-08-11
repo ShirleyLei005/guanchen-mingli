@@ -549,6 +549,7 @@ function relationshipDisclaimer() {
 export async function generateCompatibility(input: CompatibilityInput): Promise<CompatibilityResult> {
   const firstLabel = input.first.name?.trim().slice(0, 30) || "第一方";
   const secondLabel = input.second.name?.trim().slice(0, 30) || "第二方";
+  const currentYear = new Date().getFullYear();
   if (input.mode === "bazi") {
     const [first, second] = await Promise.all([
       generateBaziChart(input.first),
@@ -560,6 +561,21 @@ export async function generateCompatibility(input: CompatibilityInput): Promise<
       `${element}${first.chart.elements[element] + second.chart.elements[element]}`,
     ).join(" · ");
     const requested = input.topics.length ? input.topics : ["关系总览"];
+    const currentDecadeText = (label: string, result: BaziChartResult) => {
+      const decade = result.analysis.decades.find((item) => {
+        const years = item.range.match(/(20\d{2})[—–-](20\d{2})/);
+        return years && currentYear >= Number(years[1]) && currentYear <= Number(years[2]);
+      }) ?? result.analysis.decades[0];
+      return decade
+        ? `${label}${decade.range}${decade.ganzhi}大运，${decade.state}；${decade.activated}；观察重点：${decade.observation}`
+        : `${label}当前大运资料暂缺`;
+    };
+    const annualText = (label: string, result: BaziChartResult, year: number) => {
+      const flow = result.analysis.years.find((item) => item.year === year);
+      return flow
+        ? `${label}${year}年${flow.ganzhi}（${flow.tenGod}）：${flow.interaction}；主题${flow.theme}；建议${flow.action}`
+        : `${label}${year}年流年资料暂缺`;
+    };
     const evidenceCatalog = [
       { id: "C001", text: `${firstLabel}四柱${first.chart.bazi}，日主${first.chart.dayMaster}，日柱${firstDay.stem}${firstDay.branch}` },
       { id: "C002", text: `${secondLabel}四柱${second.chart.bazi}，日主${second.chart.dayMaster}，日柱${secondDay.stem}${secondDay.branch}` },
@@ -572,8 +588,11 @@ export async function generateCompatibility(input: CompatibilityInput): Promise<
       ...second.chart.pillars.map((pillar, index) => ({ id: `C${String(20 + index).padStart(3, "0")}`, text: `${secondLabel}${pillar.label}${pillar.stem}${pillar.branch}：十神${pillar.tenGod || "日主"}，藏干${pillar.hiddenStems.join("、") || "无"}，藏干十神${pillar.hiddenTenGods.join("、") || "无"}` })),
       ...first.chart.interactions.slice(0, 5).map((item, index) => ({ id: `C${String(30 + index).padStart(3, "0")}`, text: `${firstLabel}原局互动：${item}` })),
       ...second.chart.interactions.slice(0, 5).map((item, index) => ({ id: `C${String(40 + index).padStart(3, "0")}`, text: `${secondLabel}原局互动：${item}` })),
-      { id: "C050", text: `${firstLabel}近期大运：${first.analysis.decades.slice(0, 4).map((item) => `${item.range}${item.ganzhi}（${item.state}）`).join("、")}` },
-      { id: "C051", text: `${secondLabel}近期大运：${second.analysis.decades.slice(0, 4).map((item) => `${item.range}${item.ganzhi}（${item.state}）`).join("、")}` },
+      { id: "C050", text: `双方当前大运：${currentDecadeText(firstLabel, first)}；${currentDecadeText(secondLabel, second)}` },
+      ...[0, 1, 2].map((offset) => ({
+        id: `C${String(51 + offset).padStart(3, "0")}`,
+        text: `${currentYear + offset}年双方流年：${annualText(firstLabel, first, currentYear + offset)}；${annualText(secondLabel, second, currentYear + offset)}`,
+      })),
     ];
     const topics = [...new Set(["关系底盘", ...requested, "冲突修复", "共同成长"])].map((topic) => ({
       title: topic,
@@ -622,7 +641,24 @@ export async function generateCompatibility(input: CompatibilityInput): Promise<
       };
     }),
   ];
-  const evidenceCatalog = [...ziweiEvidence(firstLabel, first.chart, 1), ...ziweiEvidence(secondLabel, second.chart, 20)];
+  const ziweiAnnualText = (label: string, chart: ZiweiChartResult["chart"], year: number) => {
+    const flow = chart.yearlyFlow.find((item) => item.year === year);
+    return flow
+      ? `${label}${year}年${flow.ganzhi}，虚岁${flow.nominalAge}，流年命宫落${flow.palaceName}`
+      : `${label}${year}年流年资料暂缺`;
+  };
+  const evidenceCatalog = [
+    ...ziweiEvidence(firstLabel, first.chart, 1),
+    ...ziweiEvidence(secondLabel, second.chart, 20),
+    {
+      id: "C050",
+      text: `双方当前大限：${firstLabel}${first.chart.currentFortune.decadal.range.join("—")}岁${first.chart.currentFortune.decadal.ganzhi}大限落${first.chart.currentFortune.decadal.palaceName}；${secondLabel}${second.chart.currentFortune.decadal.range.join("—")}岁${second.chart.currentFortune.decadal.ganzhi}大限落${second.chart.currentFortune.decadal.palaceName}`,
+    },
+    ...[0, 1, 2].map((offset) => ({
+      id: `C${String(51 + offset).padStart(3, "0")}`,
+      text: `${currentYear + offset}年双方流年：${ziweiAnnualText(firstLabel, first.chart, currentYear + offset)}；${ziweiAnnualText(secondLabel, second.chart, currentYear + offset)}`,
+    })),
+  ];
   const topics = [...new Set(["命身互动", ...requested, "夫妻与福德", "现实协作"])].map((topic) => ({
     title: topic,
     evidence: `${firstLabel}命宫${first.chart.soulPalaceBranch}（${palaceEvidence(first.chart, ["命宫", "夫妻", "福德"])}）；${secondLabel}命宫${second.chart.soulPalaceBranch}（${palaceEvidence(second.chart, ["命宫", "夫妻", "福德"])}）。`,

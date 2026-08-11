@@ -212,7 +212,45 @@ function buildTimelineFallback(item: EvidenceItem, isDecade: boolean): AiReportC
 }
 
 function normalizePersonalTimeline(chapter: AiReportChapter, catalog: EvidenceItem[], kind: ReportKind) {
-  if (kind === "compatibility") return;
+  if (kind === "compatibility") {
+    const timingEvidence = ["C050", "C051", "C052", "C053"]
+      .map((id) => catalog.find((item) => item.id === id))
+      .filter((item): item is EvidenceItem => Boolean(item));
+    const relationshipGuidance = [
+      {
+        opportunity: "先对齐两人现阶段最重要的责任、可投入时间与安全感来源，把差异翻译成可以协商的需要，而不是对彼此性格作评价。",
+        caution: "留意一方持续追问、另一方不断退开的追逐—退缩循环；情绪升高时先暂停，约定明确的回谈时间，避免把沉默误读为拒绝。",
+      },
+      {
+        opportunity: "重要谈话可先复述对方的事实与感受，再说明自己的需要和具体请求；被理解的体验会降低防御，也更容易形成共同决定。",
+        caution: "不要把当年的盘面变化直接解释为感情结果；尤其避免读心、翻旧账和用绝对化语言放大分歧，应以双方真实行为持续核对。",
+      },
+      {
+        opportunity: "用小而稳定的共同安排累积关系安全感，例如固定沟通、共同预算或独处边界，并在约定日期检查哪些做法真正减轻了彼此负担。",
+        caution: "若现实任务增多，要防止未经讨论就默认对方应当配合；先确认承受能力和优先级，再分工，比临时催促更能保护关系。",
+      },
+      {
+        opportunity: "把阶段变化当作更新关系规则的机会：保留有效的默契，也允许双方重新表达期待；冲突后的理解、道歉、补偿和新约定同样重要。",
+        caution: "亲密并不等于没有边界。若问题涉及持续控制、威胁或人身安全，应优先寻求现实支持与专业帮助，不以命盘解释或合理化伤害。",
+      },
+    ];
+    chapter.timing = timingEvidence.map((item, index) => {
+      const generated = chapter.timing.find((entry) => entry.evidenceRefs.includes(item.id));
+      const year = parseEvidenceYear(item.text);
+      const period = index === 0 ? "双方当前大限" : year ? `${year} 流年` : `后续流年 ${index}`;
+      const guidance = relationshipGuidance[index];
+      return {
+        period,
+        theme: generated?.theme || (index === 0
+          ? `${chapter.title}在两人当前人生阶段中的承载方式`
+          : `${chapter.title}在年度变化中的沟通与协作课题`),
+        evidenceRefs: [item.id],
+        opportunity: ensureTextRange(generated?.opportunity || "", 48, 150, [guidance.opportunity]),
+        caution: ensureTextRange(generated?.caution || "", 48, 150, [guidance.caution]),
+      };
+    });
+    return;
+  }
   if (chapter.id !== "timing") {
     chapter.timing = [];
     return;
@@ -264,8 +302,12 @@ function normalizeGeneratedReport(report: GeneratedReport, catalog: EvidenceItem
       });
     }
     chapter.evidenceExplanation = chapter.evidenceExplanation.map(sanitizePublicText);
-    chapter.constructiveExpression = sanitizePublicText(chapter.constructiveExpression);
-    chapter.pressureExpression = sanitizePublicText(chapter.pressureExpression);
+    chapter.constructiveExpression = kind === "compatibility"
+      ? ensureTextRange(chapter.constructiveExpression, 70, 190, ["当彼此能够先确认感受、再说明需要，并把期待转化为清楚可协商的请求时，盘面的互补更容易落实为理解、支持与共同承担。"])
+      : sanitizePublicText(chapter.constructiveExpression);
+    chapter.pressureExpression = kind === "compatibility"
+      ? ensureTextRange(chapter.pressureExpression, 70, 190, ["当情绪升高或安全感不足时，双方可能进入追问与退避、指责与防御的循环；先暂停降温、确认彼此感受并约定回谈时间，比争论输赢更有助于修复。"])
+      : sanitizePublicText(chapter.pressureExpression);
     chapter.reflectionQuestions = chapter.reflectionQuestions.map(sanitizePublicText);
     chapter.actions = chapter.actions.map((item) => ({ ...item, title: sanitizePublicText(item.title), detail: sanitizePublicText(item.detail) }));
     chapter.timing = chapter.timing.map((item) => ({ ...item, period: sanitizePublicText(item.period), theme: sanitizePublicText(item.theme), opportunity: sanitizePublicText(item.opportunity), caution: sanitizePublicText(item.caution) }));
@@ -393,7 +435,7 @@ function systemInstructions(kind: ReportKind, chapterIds = REQUIRED_CHAPTERS[kin
     ? "使用子平法的严格分析顺序：输入与节气审计→以月令为提纲核对透干通根→从得令、得地、得助、制化多路复核旺衰→判断格局成立条件、破格与救应→把调候与扶抑分开处理→分析十神配置、五行气势与流通→最后用大运流年检验原局议题。方法分工参考《子平真诠》的月令与格局、《滴天髓》的气势流通、《穷通宝鉴》的调候、《三命通会》与《五行精纪》的交叉校核，以及《千里命稿》的案例化表达。不可仅凭五行数量、单一十神、纳音或神煞下结论；《周易》只用于变化与取舍的哲学表达，《奇门遁甲》属于另一套起局体系，未提供奇门局时不得混入八字推演。"
     : kind === "ziwei"
       ? "使用紫微斗数综合顺序：命身主轴→十二宫→三方四正→主辅星与四化→大限流年。不可只凭一颗主星、一个宫位或吉凶词下结论。"
-      : "使用双盘关系分析顺序：先分别确认双方结构→寻找互动接口→区分互补与摩擦→讨论沟通、亲密、冲突修复、现实协作与共同成长。不得用单一匹配分数或命定标签裁决关系。";
+      : "使用双盘关系分析顺序：先分别确认双方结构→寻找互动接口→区分互补与摩擦→结合双方当前大限和流年讨论关系节奏→讨论沟通、亲密、冲突修复、现实协作与共同成长。不得用单一匹配分数或命定标签裁决关系。建议部分可以借鉴依恋需求、情绪确认、非暴力沟通、冲突修复和关系边界等通用情感心理学框架，为双方提供理解与支持；不得进行心理诊断、给人格障碍标签，或用心理学术语替代盘面证据。";
   const chapterRule = kind === "compatibility"
     ? "chapters 必须且只能包含 id 为 overview、communication、intimacy、conflict、cooperation、growth 的六章，完整覆盖沟通、亲密、冲突修复、现实协作和共同成长，不得省略，也不要增加其他章节。"
     : `chapters 只能包含本次指定的章节：${chapterIds.join("、")}。健康章只讨论生活方式、压力反应和一般性保养提醒；子女、婚姻及家庭章不得断言必有、必无或确定事件。除 timing 章外，任何章节都不得分析大运、流年或输出阶段与时间线。`;
@@ -402,11 +444,11 @@ function systemInstructions(kind: ReportKind, chapterIds = REQUIRED_CHAPTERS[kin
     : "非 timing 章节 narrative 正好四段，每段65至95个汉字，四段合计不得超过400字；timing 章节 narrative 正好四段，每段100至145个汉字，合计不得超过600字。第一段说明含义，第二段交叉解释依据，第三段给出具体表现，第四段说明验证与运用。";
   const timingScope = kind !== "compatibility" && !chapterIds.includes("timing")
     ? "本次是5积分基础报告，directAnswer、coreConclusions、chapters 与 finalSynthesis 都不得分析大运、流年、具体年份或关键时间节点，也不得引用运限类证据；这些内容保留给独立流年专题。"
-    : kind !== "compatibility" ? "本次是独立流年专题，应集中使用运限证据分析当前大运、当年及随后两个流年。" : "";
+    : kind !== "compatibility" ? "本次是独立流年专题，应集中使用运限证据分析当前大运、当年及随后两个流年。" : "合盘每章都要结合双方运限证据呈现四个时间段：双方当前大限、当年流年及随后两个流年；时间段用于说明关系议题和现实协作节奏，不预测结婚或分手。";
   return `你是观辰的资深传统命理报告编辑。${method}
 你的工作是解释服务端已经计算好的命盘，不是重新排盘。只能使用证据目录里的事实；严禁自行补算、改写或发明星曜、宫位、干支、十神、四化、运限。
 写成专业但通俗的简体中文咨询报告，避免堆砌术语。必须使用命理术语时，紧接着用日常语言解释它对工作、关系、情绪或选择意味着什么。先直接回应用户最关心的问题，再解释盘面结构、正向表达、压力表达、阶段变化与现实行动。每项核心结论和时间判断必须引用 evidenceRefs；引用只能是目录中存在的编号。
-${chapterRule}${narrativeRule}${timingScope}不要反复使用“顺境时”“压力大时”等模板化开头，要根据本章的具体生活场景自然转折。不要在标题、正文、总结或行动建议中显示 B075、Z030、C001 一类内部证据编号；编号只能放入 evidenceRefs 字段。不要写“你很重感情、偶尔敏感”一类适用于多数人的空泛句子，不要重复套话。evidenceExplanation 必须用日常语言把多条盘面事实如何共同支持结论讲清楚，不能只复述证据。directAnswer 应先给清晰结论，再给关键依据和当前最值得留意的现实课题。只有 timing 章节的 timing 数组正好四项，依次为当前大运、当年流年及随后两个流年；其他个人章节 timing 必须为空数组；合盘每章 timing 最多一项。actions 两至三项，行动建议要具体到可执行步骤、观察信号和复盘方式。时间判断只能使用目录明确提供的大运或流年；合盘不得把双方阶段不同步写成分手或结婚预言。
+${chapterRule}${narrativeRule}${timingScope}不要反复使用“顺境时”“压力大时”等模板化开头，要根据本章的具体生活场景自然转折。不要在标题、正文、总结或行动建议中显示 B075、Z030、C001 一类内部证据编号；编号只能放入 evidenceRefs 字段。不要写“你很重感情、偶尔敏感”一类适用于多数人的空泛句子，不要重复套话。evidenceExplanation 必须用日常语言把多条盘面事实如何共同支持结论讲清楚，不能只复述证据。directAnswer 应先给清晰结论，再给关键依据和当前最值得留意的现实课题。个人报告只有 timing 章节的 timing 数组正好四项，其他个人章节 timing 必须为空数组；合盘每章 timing 必须正好四项，依次引用 C050、C051、C052、C053。actions 两至三项，行动建议要具体到可执行步骤、观察信号和复盘方式。时间判断只能使用目录明确提供的大运或流年；合盘不得把双方阶段不同步写成分手或结婚预言。
 命盘揭示趋势与人生课题，不决定人生。禁止确定性婚期、离婚、疾病、寿命、灾祸、投资收益或法律结果；健康、投资、法律事项只给一般性提醒并建议咨询专业人士。不要伪造古籍引文，不要宣称准确率。`;
 }
 
@@ -536,7 +578,7 @@ async function requestDeepSeekReport(args: {
     }),
     ...args.chapterIds.map((id) => () => callDeepSeekJson({
       apiKey, model, maxTokens: 3000,
-      system: `${systemInstructions(args.kind, args.chapterIds)}\n本次忽略整份 chapters 数组的格式要求，只生成“${chapterTitles[id]}”一个章节对象。id 必须为 ${id}；${args.kind === "compatibility" ? "narrative 正好4段，每段105至140字，每个模块正文不少于400字，所有句子必须完整收束" : id === "timing" ? "narrative 正好4段，每段100至145字，合计不超过600字" : "narrative 正好4段，每段65至95字，合计不超过400字"}，并包含具体生活场景；evidenceRefs 2至3项；evidenceExplanation 正好2至3项；${args.kind === "compatibility" ? "timing 最多1项" : id === "timing" ? "timing 正好4项，依次分析当前大运、当年流年及随后两个流年，每项必须引用对应运限证据" : "timing 必须为空数组，不得讨论大运或流年"}；reflectionQuestions 正好2项；actions 正好2项。只返回合法 JSON。`,
+      system: `${systemInstructions(args.kind, args.chapterIds)}\n本次忽略整份 chapters 数组的格式要求，只生成“${chapterTitles[id]}”一个章节对象。id 必须为 ${id}；${args.kind === "compatibility" ? "narrative 正好4段，每段105至140字，每个模块正文不少于400字，所有句子必须完整收束" : id === "timing" ? "narrative 正好4段，每段100至145字，合计不超过600字" : "narrative 正好4段，每段65至95字，合计不超过400字"}，并包含具体生活场景；evidenceRefs 2至3项；evidenceExplanation 正好2至3项；${args.kind === "compatibility" ? "timing 正好4项，依次为双方当前大限、当年流年及随后两个流年，并分别引用 C050、C051、C052、C053；建议应兼顾命理依据、情绪确认、清楚表达、边界与冲突修复" : id === "timing" ? "timing 正好4项，依次分析当前大运、当年流年及随后两个流年，每项必须引用对应运限证据" : "timing 必须为空数组，不得讨论大运或流年"}；reflectionQuestions 正好2项；actions 正好2项。只返回合法 JSON。`,
       user: { ...context, chapterId: id, chapterTitle: chapterTitles[id], requiredJsonShape: { id, title: chapterTitles[id], headline: "本章核心判断", narrative: args.kind === "compatibility" ? ["关系结构", "双方依据", "具体生活场景", "调整方法与验证信号"] : ["含义", "依据", "具体表现", "验证与运用"], evidenceRefs: ["有效证据编号1", "有效证据编号2"], evidenceExplanation: ["推导说明1", "推导说明2"], constructiveExpression: "更容易发挥的关系条件", pressureExpression: "需要共同调整的互动方式", timing: [{ period: "证据明确的阶段", theme: "主题", evidenceRefs: ["有效证据编号"], opportunity: "可把握", caution: "需留意" }], reflectionQuestions: ["问题1", "问题2"], actions: [{ horizon: "时间范围", title: "行动", detail: "步骤与观察信号" }, { horizon: "时间范围", title: "行动", detail: "步骤与复盘方式" }] } },
     })),
   ];
@@ -642,7 +684,7 @@ async function requestSiliconFlowReport(args: {
     }),
     ...args.chapterIds.map((id) => () => callSiliconFlowJson({
       apiKey, model, maxTokens: 3000,
-      system: `${systemInstructions(args.kind, args.chapterIds)}\n本次只生成“${chapterTitles[id]}”一个章节，id 必须严格为 ${id}。${args.kind === "compatibility" ? "narrative 正好4段，每段105至140个汉字，每个模块正文不少于400字，所有句子必须完整收束" : id === "timing" ? "narrative 正好4段，每段100至145字，合计不超过600字" : "narrative 正好4段，每段65至95字，合计不超过400字"}；evidenceRefs 正好2至3项且必须有效；evidenceExplanation 正好2项；${args.kind === "compatibility" ? "timing 最多1项" : id === "timing" ? "timing 正好4项，依次分析当前大运、当年流年及随后两个流年，每项引用对应证据" : "timing 必须为空数组"}；reflectionQuestions 正好2项；actions 正好2项。正向表达、压力表达和行动建议均须具体。只返回合法 JSON。`,
+      system: `${systemInstructions(args.kind, args.chapterIds)}\n本次只生成“${chapterTitles[id]}”一个章节，id 必须严格为 ${id}。${args.kind === "compatibility" ? "narrative 正好4段，每段105至140个汉字，每个模块正文不少于400字，所有句子必须完整收束" : id === "timing" ? "narrative 正好4段，每段100至145字，合计不超过600字" : "narrative 正好4段，每段65至95字，合计不超过400字"}；evidenceRefs 正好2至3项且必须有效；evidenceExplanation 正好2项；${args.kind === "compatibility" ? "timing 正好4项，依次为双方当前大限、当年流年及随后两个流年，并分别引用 C050、C051、C052、C053；建议应兼顾命理依据、情绪确认、清楚表达、边界与冲突修复" : id === "timing" ? "timing 正好4项，依次分析当前大运、当年流年及随后两个流年，每项引用对应证据" : "timing 必须为空数组"}；reflectionQuestions 正好2项；actions 正好2项。正向表达、压力表达和行动建议均须具体。只返回合法 JSON。`,
       user: {
         ...baseContext,
         chapterId: id,

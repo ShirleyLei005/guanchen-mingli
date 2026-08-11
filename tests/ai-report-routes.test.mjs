@@ -119,6 +119,12 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
     if (path.includes("compatibility")) {
       assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.join("").length >= 400), true);
       assert.equal(result.aiReport.chapters.every((chapter) => /[。！？]$/.test(chapter.narrative.at(-1))), true, JSON.stringify(result.aiReport.chapters.map((chapter) => chapter.narrative.at(-1))));
+      assert.equal(result.aiReport.chapters.every((chapter) => chapter.timing.length === 4), true);
+      assert.equal(result.aiReport.chapters.every((chapter) => chapter.timing[0].period === "双方当前大限"), true);
+      assert.equal(result.aiReport.chapters.every((chapter) => chapter.timing.slice(1).every((item) => /20\d{2} 流年/.test(item.period))), true);
+      assert.equal(result.aiReport.chapters.every((chapter) => chapter.timing.flatMap((item) => item.evidenceRefs).join(",") === "C050,C051,C052,C053"), true);
+      assert.equal(result.aiReport.chapters.every((chapter) => chapter.constructiveExpression.length >= 70 && chapter.pressureExpression.length >= 70), true);
+      assert.equal(["C050", "C051", "C052", "C053"].every((id) => result.aiReport.evidenceCatalog.some((item) => item.id === id)), true);
       assert.match(result.aiReport.directAnswer, /子安与清和/);
       assert.doesNotMatch(result.aiReport.directAnswer, /第一方|第二方/);
     }

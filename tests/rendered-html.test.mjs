@@ -390,6 +390,12 @@ test("compatibility defaults to Bazi and also supports Ziwei without a fake scor
     assert.deepEqual(result.profiles.map((profile) => profile.label), ["子安", "清和"]);
     assert.match(result.evidenceCatalog[0].text, /子安/);
     assert.ok(result.evidenceCatalog.some((item) => item.text.includes("清和")));
+    const timingEvidence = ["C050", "C051", "C052", "C053"].map((id) => result.evidenceCatalog.find((item) => item.id === id));
+    assert.equal(timingEvidence.every(Boolean), true);
+    assert.match(timingEvidence[0].text, /子安/);
+    assert.match(timingEvidence[0].text, /清和/);
+    assert.match(timingEvidence[0].text, /当前大运|当前大限/);
+    assert.equal(timingEvidence.slice(1).every((item) => /20\d{2}年双方流年/.test(item.text)), true);
     assert.equal("score" in result, false);
     assert.ok(result.report.topics.length >= 4);
   }
