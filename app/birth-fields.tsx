@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { PlaceMatch, SolarTimeResult } from "../lib/solar-time";
+import { GuanchenWait } from "./guanchen-wait";
 import { PlaceHierarchyPicker } from "./place-hierarchy-picker";
 
 export type ResolvedBirth = {
@@ -135,6 +136,7 @@ export function BirthFields({
           )}
         </div>
       )}
+      <GuanchenWait active={Boolean(place && !solar)} title="小道士正在校正出生时间" detail="正在根据经纬度、历史时区与均时差计算真太阳时。" estimatedSeconds={6} compact />
     </fieldset>
   );
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { BaziChartResult, CompatibilityMode, CompatibilityResult, ZiweiChartResult } from "../lib/chart-engines";
 import type { AiDeepReport } from "../lib/ai-report";
 import { BirthFields, type ResolvedBirth } from "./birth-fields";
+import { GuanchenWait } from "./guanchen-wait";
 import { SiteFooter, SiteHeader } from "./site-chrome";
 
 export type MeasurementKind = "bazi" | "ziwei" | "match" | "chat";
@@ -50,7 +51,6 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState(0);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [matchMode, setMatchMode] = useState<CompatibilityMode>("bazi");
   const [chartResult, setChartResult] = useState<BaziChartResult | ZiweiChartResult | CompatibilityResult | null>(null);
 
@@ -68,12 +68,6 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
     ];
     return () => timers.forEach(window.clearTimeout);
   }, [loading, kind]);
-
-  useEffect(() => {
-    if (!loading) return;
-    const timer = window.setInterval(() => setElapsedSeconds((value) => value + 1), 1000);
-    return () => window.clearInterval(timer);
-  }, [loading]);
 
   const updatePrimary = useCallback((value: ResolvedBirth | null) => setPrimaryBirth(value), []);
   const updateSecondary = useCallback((value: ResolvedBirth | null) => setSecondaryBirth(value), []);
@@ -110,7 +104,6 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
     setNotice("");
     setChartResult(null);
     setLoadingStage(0);
-    setElapsedSeconds(0);
     setLoading(true);
     const reportTopics = kind === "match" ? [...configs.match.topics] : selected;
     try {
@@ -167,8 +160,6 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
   }
 
   const estimatedSeconds = kind === "match" ? 70 : 75;
-  const remainingSeconds = Math.max(estimatedSeconds - elapsedSeconds, 0);
-  const loadingProgress = Math.min(96, Math.max(4, (elapsedSeconds / estimatedSeconds) * 100));
 
   return (
     <main className="inner-page">
@@ -242,16 +233,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
             ? ["正在校正并排盘…", "正在识别命盘主轴…", "正在生成深度分析…", "正在核对盘面依据…"][loadingStage]
             : kind === "match" ? "开始解析" : "开始测算"} <span>{kind === "match" ? "10 积分 · 完整双人合盘" : kind === "bazi" || kind === "ziwei" ? "5 积分 · 命盘与深度解读" : `完整专题 ${config.cost} 积分`}</span> →
         </button>
-        {loading && (
-          <section className="measurement-wait" aria-live="polite">
-            <div className="measurement-wait-head">
-              <div><small>正在生成准确命盘与完整报告</small><b>{remainingSeconds > 0 ? `预计还需 ${remainingSeconds} 秒` : "即将完成，请继续等待"}</b></div>
-              <span>{elapsedSeconds} 秒</span>
-            </div>
-            <div className="measurement-progress"><i style={{ width: `${loadingProgress}%` }} /></div>
-            <p>{["正在核对出生地点、时区与真太阳时。", "排盘已建立，正在识别命盘主轴。", "DeepSeek 正在撰写通俗、详细的解读。", "正在核对章节完整性与盘面依据。"][loadingStage]} 请保持页面打开，不要重复提交。</p>
-          </section>
-        )}
+        <GuanchenWait active={loading} title="小道士正在翻阅盘面" detail={`${["正在核对出生地点、时区与真太阳时。", "排盘已建立，正在识别命盘主轴。", "正在撰写通俗、详细的解读。", "正在核对章节完整性与盘面依据。"][loadingStage]} 请保持页面打开，不要重复提交。`} estimatedSeconds={estimatedSeconds} />
         <p className="measure-submit-help">点击后将使用已校正的真太阳时生成命盘；八字与紫微扣除 5 积分，双人合盘扣除 10 积分，生成失败不扣积分。</p>
       </section>
 
@@ -643,7 +625,6 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
   const [timingNotice, setTimingNotice] = useState("");
   const [chatQuestion, setChatQuestion] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-  const [chatElapsed, setChatElapsed] = useState(0);
   const [chatNotice, setChatNotice] = useState("");
   const [chatCredits, setChatCredits] = useState(5);
   const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string; actions?: string[] }>>([]);
@@ -661,15 +642,6 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
       })
       .catch(() => undefined);
   }, []);
-
-  useEffect(() => {
-    if (!chatLoading) {
-      setChatElapsed(0);
-      return;
-    }
-    const timer = window.setInterval(() => setChatElapsed((value) => value + 1), 1000);
-    return () => window.clearInterval(timer);
-  }, [chatLoading]);
 
   async function askChartQuestion() {
     const question = chatQuestion.trim();
@@ -791,21 +763,21 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
             <textarea value={chatQuestion} onChange={(event) => setChatQuestion(event.target.value)} maxLength={500} placeholder="写下你的具体问题，背景越清楚，回答越有针对性。" />
             <button type="button" disabled={chatLoading || !chatQuestion.trim()} onClick={() => void askChartQuestion()}>{chatLoading ? "观辰正在解析…" : "请观辰解析 · 2 积分"}</button>
           </div>
-          {chatLoading && <div className="guanchen-mini-wait" aria-live="polite"><div className="taoist-reader" aria-hidden="true"><i className="taoist-hat" /><i className="taoist-head" /><i className="taoist-robe" /><span className="taoist-book"><b /><em /></span></div><div><b>小道士正在翻阅盘面</b><span>{chatElapsed < 18 ? `预计还需 ${18 - chatElapsed} 秒` : "正在完成最后核对"}</span></div></div>}
+          <GuanchenWait active={chatLoading} title="小道士正在翻阅盘面" detail="正在结合当前命盘与问题组织解答，生成失败不会扣积分。" estimatedSeconds={18} />
           {chatNotice && <p className="chart-chat-notice">{chatNotice}</p>}
         </section>
       ) : timingLocked ? <section className="timing-unlock-panel">
         <div><small>独立流年专题</small><h3>流年运势及关键节点</h3><p>集中分析当前大运、今年及随后两个流年的主题、机会与需要提前准备的关键节点。基础六个模块不重复讨论时间线。</p><ul><li>当前大运的长期环境与核心课题</li><li>当年流年及随后两个流年的变化节奏</li><li>可验证的现实信号与行动建议</li></ul></div>
         <aside><b>3 积分</b><span>成功生成后扣除</span><button type="button" disabled={timingLoading} onClick={() => void unlockTimingReport()}>{timingLoading ? "正在分析大运流年…" : "解锁流年分析"}</button></aside>
-        {timingLoading && <div className="guanchen-mini-wait"><div className="taoist-reader" aria-hidden="true"><i className="taoist-hat" /><i className="taoist-head" /><i className="taoist-robe" /><span className="taoist-book"><b /><em /></span></div><div><b>正在核对大运与流年</b><span>请保持页面打开，生成失败不会扣积分</span></div></div>}
+        <GuanchenWait active={timingLoading} title="小道士正在核对大运与流年" detail="请保持页面打开，生成失败不会扣积分。" estimatedSeconds={35} />
         {timingNotice && <p className="chart-chat-notice">{timingNotice}</p>}
       </section> : active ? <article className="ai-report-chapter">
         <header><small>专题解读</small><h3>{active.title}</h3><h4>{active.headline}</h4></header>
         <div className="ai-narrative">{active.narrative.map((paragraph, index) => <p key={`${active.id}-n-${index}`}>{paragraph}</p>)}</div>
 
         <section className="ai-expression-grid">
-          <article><small>更容易发挥的方式</small><p>{active.constructiveExpression}</p></article>
-          <article><small>需要主动调整的地方</small><p>{active.pressureExpression}</p></article>
+          <article><small>值得主动把握的方向</small><p>{active.constructiveExpression}</p></article>
+          <article><small>需要提前留意的课题</small><p>{active.pressureExpression}</p></article>
         </section>
 
         <section className="ai-evidence-section">

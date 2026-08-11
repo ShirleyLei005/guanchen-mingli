@@ -79,14 +79,29 @@ test("birthplace uses an editable country-province-prefecture-district hierarchy
 });
 
 test("measurement UX includes a visible wait state and full compatibility scope", async () => {
-  const source = await readFile(new URL("../app/measurement-page.tsx", import.meta.url), "utf8");
-  assert.match(source, /预计还需/);
-  assert.match(source, /正在生成准确命盘与完整报告/);
+  const [source, waitSource] = await Promise.all([
+    readFile(new URL("../app/measurement-page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/guanchen-wait.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(waitSource, /预计还需/);
+  assert.match(waitSource, /taoist-reader/);
+  assert.match(source, /小道士正在翻阅盘面/);
   assert.match(source, /无需选择方向，默认进行全维度合盘解析/);
   assert.match(source, /完整覆盖八项关系主题/);
   assert.match(source, /小道士正在翻阅盘面/);
   assert.match(source, /400—600 字/);
   assert.match(source, /请观辰解析 · 2 积分/);
+  assert.match(source, /值得主动把握的方向/);
+  assert.match(source, /需要提前留意的课题/);
+  assert.doesNotMatch(source, /更容易发挥的方式|需要主动调整的地方/);
+});
+
+test("all user-facing async waits share the Taoist reader countdown", async () => {
+  const files = ["measurement-page.tsx", "birth-fields.tsx", "place-hierarchy-picker.tsx", "mingli-app.tsx", "login/login-card.tsx"];
+  for (const file of files) {
+    const source = await readFile(new URL(`../app/${file}`, import.meta.url), "utf8");
+    assert.match(source, /GuanchenWait/, `${file} should use the shared wait component`);
+  }
 });
 
 test("public report UI hides internal version and evidence identifiers", async () => {

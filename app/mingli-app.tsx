@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { PlaceMatch, SolarTimeResult } from "../lib/solar-time";
+import { GuanchenWait } from "./guanchen-wait";
 import { PlaceHierarchyPicker } from "./place-hierarchy-picker";
 
 type Product = "bazi" | "ziwei" | "match" | "chat";
@@ -317,6 +318,7 @@ export function MingliApp() {
                   )}
                 </div>
               )}
+              <GuanchenWait active={solarLoading} title="小道士正在校正出生时间" detail="正在根据出生地经纬度与历史时区计算真太阳时。" estimatedSeconds={6} compact />
               {notice && <p className="form-notice">{notice}</p>}
               <div className="wizard-actions"><button className="back-btn" onClick={() => setStep(1)}>返回</button><button className="submit-btn" onClick={nextFromBirth}>确认时间，下一步 <span>→</span></button></div>
             </div>

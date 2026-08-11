@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { GuanchenWait } from "../guanchen-wait";
 
 export function LoginCard() {
   const [email, setEmail] = useState("");
@@ -31,6 +32,7 @@ export function LoginCard() {
     <label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="至少 6 位字符" autoComplete="current-password" minLength={6} required /></label>
     <label className="login-check"><input type="checkbox" name="remember" defaultChecked /> 记住我</label>
     <button type="submit" disabled={loading}>{loading ? "正在进入…" : "登录或注册并继续"}</button>
+    <GuanchenWait active={loading} title="小道士正在核对账号" detail="正在确认测试积分与登录状态。" estimatedSeconds={5} compact />
     {notice && <small aria-live="polite">{notice}</small>}
     <small>测试期账号用于领取和核验积分；正式身份与资料同步将在生产上线前接入。</small>
   </form>;

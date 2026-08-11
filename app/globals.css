@@ -732,6 +732,14 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .guanchen-mini-wait > div:last-child { display: grid; gap: 5px; }
 .guanchen-mini-wait b { font: 700 14px/1.5 system-ui,sans-serif; }
 .guanchen-mini-wait span { color: #88745a; font: 12px/1.5 system-ui,sans-serif; }
+.guanchen-mini-wait small { color: #727970; font: 10px/1.55 system-ui,sans-serif; }
+.guanchen-wait-copy { flex: 1; min-width: 0; }
+.guanchen-wait-progress { display: block; width: 100%; height: 4px; margin-top: 5px; overflow: hidden; background: rgba(33,72,60,.12); border-radius: 99px; }
+.guanchen-wait-progress em { display: block; height: 100%; background: linear-gradient(90deg,var(--jade),#c29652); border-radius: inherit; transition: width .8s ease; }
+.guanchen-mini-wait.compact { gap: 12px; margin-top: 10px; padding: 11px 13px; }
+.guanchen-mini-wait.compact .taoist-reader { width: 48px; height: 43px; flex-basis: 48px; transform: scale(.8); transform-origin: center; }
+.guanchen-mini-wait.compact b { font-size: 12px; }
+.guanchen-mini-wait.compact span { font-size: 10px; }
 .taoist-reader { position: relative; width: 62px; height: 54px; flex: 0 0 62px; }
 .taoist-hat { position: absolute; left: 18px; top: 1px; width: 26px; height: 9px; background: #1e463a; border-radius: 60% 60% 20% 20%; transform: rotate(-4deg); }
 .taoist-head { position: absolute; left: 24px; top: 8px; width: 15px; height: 15px; background: #d7b477; border-radius: 50%; }
