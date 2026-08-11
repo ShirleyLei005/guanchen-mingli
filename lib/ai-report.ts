@@ -431,6 +431,33 @@ async function requestDeepSeekReport(args: {
     conflict: "冲突修复", cooperation: "现实协作", growth: "共同成长",
   };
   const context = { reportKind: args.kind, question: args.question, selectedTopics: args.topics, evidenceCatalog: args.catalog, correction: args.correction || "" };
+  const timingOnly = args.kind !== "compatibility" && args.chapterIds.length === 1 && args.chapterIds[0] === "timing";
+  if (timingOnly) {
+    const chapter = await callDeepSeekJson({
+      apiKey, model, maxTokens: 3600,
+      system: `${systemInstructions(args.kind, args.chapterIds)}\n本次只生成“流年运势及关键节点”一个章节对象，不生成报告总览。id 必须为 timing；narrative 正好4段，每段100至145字，合计不超过600字；evidenceRefs 2至3项；evidenceExplanation 正好2至3项；timing 正好4项，依次分析当前大运、当年流年及随后两个流年，每项引用对应运限证据；reflectionQuestions 正好2项；actions 正好2项。只返回合法 JSON。`,
+      user: { ...context, chapterId: "timing", chapterTitle: chapterTitles.timing, requiredJsonShape: { id: "timing", title: chapterTitles.timing, headline: "本章核心判断", narrative: ["长期阶段主题", "当年变化", "随后两年节奏", "验证与准备"], evidenceRefs: ["有效证据编号1", "有效证据编号2"], evidenceExplanation: ["推导说明1", "推导说明2"], constructiveExpression: "可主动把握的方向", pressureExpression: "需要提前准备的地方", timing: [{ period: "当前大运或具体流年", theme: "主题", evidenceRefs: ["有效运限证据编号"], opportunity: "可把握", caution: "需留意" }], reflectionQuestions: ["问题1", "问题2"], actions: [{ horizon: "未来30天", title: "行动", detail: "步骤与观察信号" }, { horizon: "未来三个月", title: "行动", detail: "步骤与复盘方式" }] } },
+    }) as AiReportChapter;
+    const refs = Array.isArray(chapter.evidenceRefs) ? chapter.evidenceRefs : [];
+    const narrative = Array.isArray(chapter.narrative) ? chapter.narrative : [];
+    const summaryText = narrative.join("").slice(0, 300) || "流年专题将当前大运与未来三个流年放在一起观察，用来辨认阶段主题、现实信号与可提前准备的行动。";
+    return {
+      parsed: {
+        title: "流年运势及关键节点",
+        directAnswer: summaryText.length >= 100 ? summaryText : `${summaryText}这些时间信息只表示议题更容易被触发的窗口，仍需结合当下资源、选择与真实反馈持续校正。`,
+        coreConclusions: [
+          { title: "阶段主轴", conclusion: narrative[0] || summaryText, evidenceRefs: refs.slice(0, 2) },
+          { title: "流年变化", conclusion: narrative[1] || summaryText, evidenceRefs: refs.slice(0, 2) },
+          { title: "行动准备", conclusion: narrative[3] || summaryText, evidenceRefs: refs.slice(0, 2) },
+        ],
+        chapters: [chapter],
+        finalSynthesis: narrative.slice(0, 3).length === 3 ? narrative.slice(0, 3) : [summaryText, "以现实信号验证阶段判断。", "最终选择仍由自己决定。"],
+        boundaries: ["传统文化娱乐与自我反思参考。", "时间提示不承诺具体事件。", "不替代医疗、投资或法律等专业意见。"],
+      },
+      model,
+      provider: "deepseek" as const,
+    };
+  }
   const jobs: Array<() => Promise<unknown>> = [
     () => callDeepSeekJson({
       apiKey, model, maxTokens: 2400,
@@ -460,28 +487,46 @@ async function requestDeepSeekReport(args: {
 }
 
 async function callDeepSeekJson(args: { apiKey: string; model: string; maxTokens: number; system: string; user: unknown }) {
-  let response: Response;
-  try {
-    response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${args.apiKey}` },
-      signal: AbortSignal.timeout(120_000),
-      body: JSON.stringify({ model: args.model, stream: false, thinking: { type: "disabled" }, temperature: 0.4, max_tokens: args.maxTokens, response_format: { type: "json_object" }, messages: [{ role: "system", content: args.system }, { role: "user", content: JSON.stringify(args.user) }] }),
-    });
-  } catch (error) {
-    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new AiReportError("AI_TIMEOUT", "DeepSeek 生成超时，本次请求已停止，请稍后重试");
-    throw new AiReportError("DEEPSEEK_REQUEST_FAILED", "无法连接 DeepSeek 服务，请稍后重试");
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let response: Response;
+    try {
+      response = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${args.apiKey}` },
+        signal: AbortSignal.timeout(120_000),
+        body: JSON.stringify({
+          model: args.model,
+          stream: false,
+          thinking: { type: "disabled" },
+          temperature: attempt === 0 ? 0.4 : 0.15,
+          max_tokens: args.maxTokens,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: `${args.system}${attempt ? "\n上一次返回不是可解析的完整 JSON。本次请缩短措辞并确保所有引号、数组和花括号完整闭合。" : ""}` },
+            { role: "user", content: JSON.stringify(args.user) },
+          ],
+        }),
+      });
+    } catch (error) {
+      if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new AiReportError("AI_TIMEOUT", "DeepSeek 生成超时，本次请求已停止，请稍后重试");
+      throw new AiReportError("DEEPSEEK_REQUEST_FAILED", "无法连接 DeepSeek 服务，请稍后重试");
+    }
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    if (!response.ok) {
+      const message = payload?.error?.message || "";
+      if (response.status === 401 || /invalid.*key|authentication|unauthorized/i.test(message)) throw new AiReportError("AI_AUTHENTICATION_FAILED", "DeepSeek 服务认证失败，请检查 DEEPSEEK_API_KEY");
+      if (response.status === 402 || /balance|余额|insufficient/i.test(message)) throw new AiReportError("AI_QUOTA_EXHAUSTED", "DeepSeek API 余额不足，请检查账户余额");
+      if (response.status === 429) throw new AiReportError("AI_RATE_LIMITED", "DeepSeek 请求较多，请稍后重试");
+      if (response.status === 413 || /token|context|too large/i.test(message)) throw new AiReportError("AI_TOKEN_LIMIT", "本次盘面资料超过 DeepSeek 上下文限制，请稍后重试");
+      throw new AiReportError("DEEPSEEK_REQUEST_FAILED", message || `DeepSeek 请求失败（${response.status}）`);
+    }
+    try {
+      return parseJsonObject(extractGroqOutputText(payload));
+    } catch (error) {
+      if (!(error instanceof AiReportError) || !["INVALID_JSON", "INCOMPLETE", "EMPTY_OUTPUT"].includes(error.code) || attempt === 1) throw error;
+    }
   }
-  const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
-  if (!response.ok) {
-    const message = payload?.error?.message || "";
-    if (response.status === 401 || /invalid.*key|authentication|unauthorized/i.test(message)) throw new AiReportError("AI_AUTHENTICATION_FAILED", "DeepSeek 服务认证失败，请检查 DEEPSEEK_API_KEY");
-    if (response.status === 402 || /balance|余额|insufficient/i.test(message)) throw new AiReportError("AI_QUOTA_EXHAUSTED", "DeepSeek API 余额不足，请检查账户余额");
-    if (response.status === 429) throw new AiReportError("AI_RATE_LIMITED", "DeepSeek 请求较多，请稍后重试");
-    if (response.status === 413 || /token|context|too large/i.test(message)) throw new AiReportError("AI_TOKEN_LIMIT", "本次盘面资料超过 DeepSeek 上下文限制，请稍后重试");
-    throw new AiReportError("DEEPSEEK_REQUEST_FAILED", message || `DeepSeek 请求失败（${response.status}）`);
-  }
-  return parseJsonObject(extractGroqOutputText(payload));
+  throw new AiReportError("INVALID_JSON", "AI 返回内容暂时无法整理成报告，请稍后重试");
 }
 
 async function requestSiliconFlowReport(args: {

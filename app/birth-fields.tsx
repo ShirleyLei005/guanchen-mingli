@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { PlaceMatch, SolarTimeResult } from "../lib/solar-time";
+import { PlaceHierarchyPicker } from "./place-hierarchy-picker";
 
 export type ResolvedBirth = {
   name: string;
@@ -37,32 +38,8 @@ export function BirthFields({
   const [calendar, setCalendar] = useState<"solar" | "lunar">("solar");
   const [isLeapMonth, setIsLeapMonth] = useState(false);
   const [dateTime, setDateTime] = useState("1992-08-18T08:30");
-  const [query, setQuery] = useState(defaultPlace);
   const [place, setPlace] = useState<PlaceMatch | null>(null);
-  const [options, setOptions] = useState<PlaceMatch[]>([]);
-  const [searching, setSearching] = useState(false);
   const [solar, setSolar] = useState<SolarTimeResult | null>(null);
-
-  useEffect(() => {
-    if (place || query.trim().length < 2) return;
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      setSearching(true);
-      try {
-        const response = await fetch(`/api/geocode?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
-        const data = await response.json() as { results?: PlaceMatch[] };
-        setOptions(data.results ?? []);
-      } catch (error) {
-        if ((error as Error).name !== "AbortError") setOptions([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 320);
-    return () => {
-      controller.abort();
-      window.clearTimeout(timer);
-    };
-  }, [place, query]);
 
   useEffect(() => {
     if (!place || !dateTime) return;
@@ -144,30 +121,7 @@ export function BirthFields({
           </>
         )}
       </label>
-      <label className="measure-place">出生国家 / 省市区
-        <input
-          value={query}
-          onChange={(event) => { resetResolved(); setPlace(null); setOptions([]); setQuery(event.target.value); }}
-          placeholder="例如：中国 云南省 曲靖市 麒麟区，或 Paris France"
-          autoComplete="off"
-        />
-        {searching && <span className="measure-searching">正在匹配…</span>}
-        {options.length > 0 && (
-          <div className="measure-place-options">
-            {options.map((option) => (
-              <button type="button" key={option.id} onClick={() => {
-                resetResolved();
-                setPlace(option);
-                setQuery(displayPlace(option));
-                setOptions([]);
-              }}>
-                <span><b>{option.name}</b><small>{displayPlace(option)}</small></span>
-                <em>{option.latitude.toFixed(4)}°, {option.longitude.toFixed(4)}°</em>
-              </button>
-            ))}
-          </div>
-        )}
-      </label>
+      <PlaceHierarchyPicker defaultCity={defaultPlace} onChange={(nextPlace) => { resetResolved(); setPlace(nextPlace); }} />
       {place && (
         <div className="measure-solar">
           <div><b>真太阳时校正</b><span>{solar ? "已完成" : "计算中…"}</span></div>

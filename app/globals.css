@@ -165,6 +165,26 @@ textarea { min-height: 90px; resize: vertical; }
 .place-options b { font-size: 13px; }
 .place-options span { color: #737c77; font-size: 11px; }
 .place-options em { color: #8d938f; font-size: 10px; font-style: normal; }
+.hierarchy-place { position: relative; z-index: 8; margin: 8px 0 24px; padding: 20px; border: 1px solid rgba(63,120,99,.25); background: #f6f2e8; }
+.hierarchy-place > header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 14px; font-family: system-ui, sans-serif; }
+.hierarchy-place > header b { color: var(--pine); font-size: 13px; }
+.hierarchy-place > header span { color: #7a827d; font-size: 11px; }
+.hierarchy-place-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+.hierarchy-place-grid label { position: relative; min-width: 0; margin: 0; color: #56615c; font-size: 11px; }
+.hierarchy-place-grid input { height: 47px; padding: 12px; margin-top: 7px; }
+.hierarchy-combobox { z-index: 2; }
+.hierarchy-combobox:focus-within { z-index: 12; }
+.hierarchy-options { position: absolute; top: calc(100% + 2px); left: 0; width: max(100%, 300px); max-height: 280px; overflow: auto; border: 1px solid rgba(23,37,31,.22); background: #fff; box-shadow: 0 18px 45px rgba(23,37,31,.16); }
+.hierarchy-options button { display: block; width: 100%; padding: 11px 12px; border: 0; border-bottom: 1px solid var(--line); background: #fff; text-align: left; cursor: pointer; }
+.hierarchy-options button:hover { background: #f3eee3; }
+.hierarchy-options b, .hierarchy-options small { display: block; }
+.hierarchy-options b { color: var(--pine); font-size: 12px; }
+.hierarchy-options small { margin-top: 4px; color: #7c847f; font-size: 9px; line-height: 1.45; }
+.hierarchy-confirm { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; margin-top: 14px; }
+.hierarchy-confirm button { padding: 11px 16px; border: 0; color: #fff; background: var(--pine); cursor: pointer; }
+.hierarchy-confirm button:disabled { opacity: .6; cursor: wait; }
+.hierarchy-confirm span { color: #6f7974; font: 11px/1.6 system-ui, sans-serif; }
+.hierarchy-place > p { margin: 10px 0 0; color: #984d3c; font: 11px/1.6 system-ui, sans-serif; }
 .solar-card { margin: 8px 0 24px; border: 1px solid rgba(63,120,99,.3); background: #f0f6f2; padding: 18px; }
 .solar-card-head { display: flex; justify-content: space-between; color: var(--pine); font: 700 12px/1 system-ui, sans-serif; }
 .solar-card-head b { color: var(--jade); }
@@ -898,6 +918,12 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
   .wizard-head { padding: 17px 18px; }
   .wizard-panel { padding: 26px 18px 30px; }
   .form-row { grid-template-columns: 1fr; }
+  .hierarchy-place { padding: 16px; }
+  .hierarchy-place > header { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .hierarchy-place-grid { grid-template-columns: 1fr; }
+  .hierarchy-options { width: 100%; }
+  .hierarchy-confirm { grid-template-columns: 1fr; }
+  .hierarchy-confirm button { width: 100%; }
   .tool-picker { grid-template-columns: 1fr; }
   .tool-picker > button { border-right: 0; border-bottom: 1px solid var(--line) !important; }
   .tool-picker > button:last-child { border-bottom: 0 !important; }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { PlaceMatch, SolarTimeResult } from "../lib/solar-time";
+import { PlaceHierarchyPicker } from "./place-hierarchy-picker";
 
 type Product = "bazi" | "ziwei" | "match" | "chat";
 type ChartResult = {
@@ -59,10 +60,7 @@ export function MingliApp() {
   const [date, setDate] = useState("1992-08-18T08:30");
   const [gender, setGender] = useState("女");
   const [calendar, setCalendar] = useState("solar");
-  const [placeQuery, setPlaceQuery] = useState("昆明");
   const [place, setPlace] = useState<PlaceMatch | null>(null);
-  const [placeOptions, setPlaceOptions] = useState<PlaceMatch[]>([]);
-  const [placeLoading, setPlaceLoading] = useState(false);
   const [solarTime, setSolarTime] = useState<SolarTimeResult | null>(null);
   const [solarLoading, setSolarLoading] = useState(false);
   const [question, setQuestion] = useState("");
@@ -83,29 +81,6 @@ export function MingliApp() {
     window.addEventListener("guanchen:credits", update);
     return () => window.removeEventListener("guanchen:credits", update);
   }, []);
-
-  useEffect(() => {
-    if (place || placeQuery.trim().length < 2) {
-      return;
-    }
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      setPlaceLoading(true);
-      try {
-        const response = await fetch(`/api/geocode?q=${encodeURIComponent(placeQuery.trim())}`, { signal: controller.signal });
-        const data = await response.json() as { results?: PlaceMatch[] };
-        setPlaceOptions(data.results ?? []);
-      } catch (error) {
-        if ((error as Error).name !== "AbortError") setPlaceOptions([]);
-      } finally {
-        setPlaceLoading(false);
-      }
-    }, 350);
-    return () => {
-      controller.abort();
-      window.clearTimeout(timer);
-    };
-  }, [placeQuery, place]);
 
   useEffect(() => {
     if (!place || !date) {
@@ -142,13 +117,6 @@ export function MingliApp() {
       setStep(2);
       window.setTimeout(() => document.querySelector("#calculator")?.scrollIntoView({ behavior: "smooth" }), 50);
     }
-  }
-
-  function selectPlace(option: PlaceMatch) {
-    setSolarTime(null);
-    setPlace(option);
-    setPlaceQuery([option.name, option.admin1, option.country].filter(Boolean).join(" · "));
-    setPlaceOptions([]);
   }
 
   function nextFromBirth() {
@@ -324,26 +292,7 @@ export function MingliApp() {
                   <input type="datetime-local" value={date} onChange={(event) => { setSolarTime(null); setDate(event.target.value); }} />
                 {calendar === "lunar" && <small className="field-help">正式排盘会先在服务端校验闰月并换算阳历；当前页面仅演示时间与地点校正链。</small>}
               </label>
-              <label className="place-field">出生国家 / 省市区
-                <input
-                  value={placeQuery}
-                  onChange={(event) => { setSolarTime(null); setPlace(null); setPlaceOptions([]); setPlaceQuery(event.target.value); }}
-                  placeholder="输入国家、省、市或区县，例如：中国 云南省 曲靖市 麒麟区"
-                  autoComplete="off"
-                  aria-autocomplete="list"
-                />
-                {placeLoading && <span className="input-status">正在匹配地点…</span>}
-                {placeOptions.length > 0 && (
-                  <div className="place-options" role="listbox">
-                    {placeOptions.map((option) => (
-                      <button key={option.id} onClick={() => selectPlace(option)} role="option" aria-selected="false">
-                        <b>{option.name}</b><span>{[option.country, option.admin1, option.admin2, option.admin3, option.admin4].filter(Boolean).join(" · ")}</span>
-                        <em>{option.latitude.toFixed(4)}°, {option.longitude.toFixed(4)}°</em>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </label>
+              <PlaceHierarchyPicker defaultCity="昆明" onChange={(nextPlace) => { setSolarTime(null); setPlace(nextPlace); }} />
 
               {place && (
                 <div className="solar-card" aria-live="polite">

@@ -33,13 +33,18 @@ function mockReport(kind) {
   };
 }
 
-async function getWorkerWithDeepSeekMock() {
+async function getWorkerWithDeepSeekMock(options = {}) {
   process.env.AI_REPORT_PROVIDER = "deepseek";
   process.env.DEEPSEEK_API_KEY = "mock-key";
   globalThis.fetch = async (input, init) => {
     assert.match(String(input), /api\.deepseek\.com\/chat\/completions/);
     const request = JSON.parse(String(init?.body || "{}"));
     const context = JSON.parse(request.messages[1].content);
+    options.calls = (options.calls || 0) + 1;
+    if (context.chapterId === "timing" && options.malformedTimingOnce && !options.malformedTimingReturned) {
+      options.malformedTimingReturned = true;
+      return Response.json({ choices: [{ finish_reason: "stop", message: { content: '{"id":"timing","title":"流年运势及关键节点"' } }] });
+    }
     if (context.task === "chart_question") {
       const shortAnswer = String(context.question).includes("短回答恢复测试");
       return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({
@@ -178,4 +183,24 @@ test("short but evidence-grounded model output is completed instead of discarded
   const result = await response.json();
   assert.ok(result.answer.length >= 400 && result.answer.length <= 600);
   assert.equal(result.remainingCredits, 3);
+});
+
+test("timing report retries one malformed AI response, succeeds, and charges only after success", async () => {
+  const options = { malformedTimingOnce: true, calls: 0 };
+  const worker = await getWorkerWithDeepSeekMock(options);
+  const report = mockReport("bazi");
+  report.evidenceCatalog = [
+    { id: "B001", text: "四柱结构测试依据" },
+    { id: "B003", text: "五行结构测试依据" },
+    { id: "B050", text: "大运2024—2033 癸酉：当前阶段主题" },
+    { id: "B070", text: "2026年丙午：当年流年主题" },
+    { id: "B071", text: "2027年丁未：下一年流年主题" },
+    { id: "B072", text: "2028年戊申：随后流年主题" },
+  ];
+  const response = await call(worker, "/api/charts/timing", { kind: "bazi", evidenceCatalog: report.evidenceCatalog }, 20);
+  const result = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(result));
+  assert.equal(result.chapter.id, "timing");
+  assert.equal(result.remainingCredits, 17);
+  assert.equal(options.calls, 2, "one malformed response should trigger exactly one retry without a redundant summary request");
 });

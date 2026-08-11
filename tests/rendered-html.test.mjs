@@ -63,6 +63,21 @@ test("birth forms collect a name for personalized reports", async () => {
   assert.doesNotMatch(source, /合盘报告会使用这个名字展示双方信息/);
 });
 
+test("birthplace uses an editable country-province-prefecture-district hierarchy", async () => {
+  const [picker, birthForm, home] = await Promise.all([
+    readFile(new URL("../app/place-hierarchy-picker.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/birth-fields.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/mingli-app.tsx", import.meta.url), "utf8"),
+  ]);
+  for (const label of ["国家 / 地区", "省 / 州", "地级市", "区 / 县（选填）"]) assert.match(picker, new RegExp(label));
+  assert.match(picker, /选择或填写国家/);
+  assert.match(picker, /优先确认地级市/);
+  assert.match(picker, /确认出生地点/);
+  assert.match(picker, /function cityName/);
+  assert.match(birthForm, /<PlaceHierarchyPicker/);
+  assert.match(home, /<PlaceHierarchyPicker/);
+});
+
 test("measurement UX includes a visible wait state and full compatibility scope", async () => {
   const source = await readFile(new URL("../app/measurement-page.tsx", import.meta.url), "utf8");
   assert.match(source, /预计还需/);
