@@ -119,6 +119,21 @@ function ensureTextRange(text: string, minLength: number, maxLength: number, sup
   return /[。！？]$/.test(result) ? result : `${result.replace(/[，、；：\s]+$/, "")}。`;
 }
 
+function normalizeHealthHeadline(chapter: AiReportChapter, kind: ReportKind) {
+  if (chapter.id !== "health" || kind === "compatibility") return;
+  const current = sanitizePublicText(chapter.headline);
+  const isPlaceholder = !current || current.length < 12 || /^(?:本章)?(?:核心判断|健康分析|健康状况|健康解读)[：。]?$/.test(current);
+  if (!isPlaceholder) {
+    chapter.headline = /[。！？]$/.test(current) ? current : `${current}。`;
+    return;
+  }
+  const source = sanitizePublicText(chapter.narrative[0] || chapter.constructiveExpression || "");
+  const firstSentence = source.match(/^.{12,58}?[。！？]/)?.[0];
+  const firstClause = source.match(/^.{12,48}?[，；：]/)?.[0]?.replace(/[，；：]$/, "");
+  const candidate = firstSentence || (firstClause ? `${firstClause}。` : "健康部分重点观察生活节律、压力反应与恢复方式，以规律调节和现实检查作为判断依据。");
+  chapter.headline = candidate;
+}
+
 const CHAPTER_SUPPLEMENTS: Record<string, string[]> = {
   overview: [
     "命盘总览要看多项结构如何彼此支持或牵制，再判断它们在现实选择中更可能呈现出的方式。",
@@ -301,6 +316,7 @@ function normalizeGeneratedReport(report: GeneratedReport, catalog: EvidenceItem
         return ensureTextRange(paragraph, min, max, [supplements[index % supplements.length], fact]);
       });
     }
+    normalizeHealthHeadline(chapter, kind);
     chapter.evidenceExplanation = chapter.evidenceExplanation.map(sanitizePublicText);
     chapter.constructiveExpression = kind === "compatibility"
       ? ensureTextRange(chapter.constructiveExpression, 70, 190, ["当彼此能够先确认感受、再说明需要，并把期待转化为清楚可协商的请求时，盘面的互补更容易落实为理解、支持与共同承担。"])
@@ -448,7 +464,7 @@ function systemInstructions(kind: ReportKind, chapterIds = REQUIRED_CHAPTERS[kin
   return `你是观辰的资深传统命理报告编辑。${method}
 你的工作是解释服务端已经计算好的命盘，不是重新排盘。只能使用证据目录里的事实；严禁自行补算、改写或发明星曜、宫位、干支、十神、四化、运限。
 写成专业但通俗的简体中文咨询报告，避免堆砌术语。必须使用命理术语时，紧接着用日常语言解释它对工作、关系、情绪或选择意味着什么。先直接回应用户最关心的问题，再解释盘面结构、正向表达、压力表达、阶段变化与现实行动。每项核心结论和时间判断必须引用 evidenceRefs；引用只能是目录中存在的编号。
-${chapterRule}${narrativeRule}${timingScope}不要反复使用“顺境时”“压力大时”等模板化开头，要根据本章的具体生活场景自然转折。不要在标题、正文、总结或行动建议中显示 B075、Z030、C001 一类内部证据编号；编号只能放入 evidenceRefs 字段。不要写“你很重感情、偶尔敏感”一类适用于多数人的空泛句子，不要重复套话。evidenceExplanation 必须用日常语言把多条盘面事实如何共同支持结论讲清楚，不能只复述证据。directAnswer 应先给清晰结论，再给关键依据和当前最值得留意的现实课题。个人报告只有 timing 章节的 timing 数组正好四项，其他个人章节 timing 必须为空数组；合盘每章 timing 必须正好四项，依次引用 C050、C051、C052、C053。actions 两至三项，行动建议要具体到可执行步骤、观察信号和复盘方式。时间判断只能使用目录明确提供的大运或流年；合盘不得把双方阶段不同步写成分手或结婚预言。
+${chapterRule}${narrativeRule}${timingScope}健康章节的 headline 必须是一句25至50字、能概括本章重点的完整结论，格式与其他章节一致；禁止写“本章核心判断”“健康分析”“健康状况”等占位标签。不要反复使用“顺境时”“压力大时”等模板化开头，要根据本章的具体生活场景自然转折。不要在标题、正文、总结或行动建议中显示 B075、Z030、C001 一类内部证据编号；编号只能放入 evidenceRefs 字段。不要写“你很重感情、偶尔敏感”一类适用于多数人的空泛句子，不要重复套话。evidenceExplanation 必须用日常语言把多条盘面事实如何共同支持结论讲清楚，不能只复述证据。directAnswer 应先给清晰结论，再给关键依据和当前最值得留意的现实课题。个人报告只有 timing 章节的 timing 数组正好四项，其他个人章节 timing 必须为空数组；合盘每章 timing 必须正好四项，依次引用 C050、C051、C052、C053。actions 两至三项，行动建议要具体到可执行步骤、观察信号和复盘方式。时间判断只能使用目录明确提供的大运或流年；合盘不得把双方阶段不同步写成分手或结婚预言。
 命盘揭示趋势与人生课题，不决定人生。禁止确定性婚期、离婚、疾病、寿命、灾祸、投资收益或法律结果；健康、投资、法律事项只给一般性提醒并建议咨询专业人士。不要伪造古籍引文，不要宣称准确率。`;
 }
 
@@ -579,7 +595,7 @@ async function requestDeepSeekReport(args: {
     ...args.chapterIds.map((id) => () => callDeepSeekJson({
       apiKey, model, maxTokens: 3000,
       system: `${systemInstructions(args.kind, args.chapterIds)}\n本次忽略整份 chapters 数组的格式要求，只生成“${chapterTitles[id]}”一个章节对象。id 必须为 ${id}；${args.kind === "compatibility" ? "narrative 正好4段，每段105至140字，每个模块正文不少于400字，所有句子必须完整收束" : id === "timing" ? "narrative 正好4段，每段100至145字，合计不超过600字" : "narrative 正好4段，每段65至95字，合计不超过400字"}，并包含具体生活场景；evidenceRefs 2至3项；evidenceExplanation 正好2至3项；${args.kind === "compatibility" ? "timing 正好4项，依次为双方当前大限、当年流年及随后两个流年，并分别引用 C050、C051、C052、C053；建议应兼顾命理依据、情绪确认、清楚表达、边界与冲突修复" : id === "timing" ? "timing 正好4项，依次分析当前大运、当年流年及随后两个流年，每项必须引用对应运限证据" : "timing 必须为空数组，不得讨论大运或流年"}；reflectionQuestions 正好2项；actions 正好2项。只返回合法 JSON。`,
-      user: { ...context, chapterId: id, chapterTitle: chapterTitles[id], requiredJsonShape: { id, title: chapterTitles[id], headline: "本章核心判断", narrative: args.kind === "compatibility" ? ["关系结构", "双方依据", "具体生活场景", "调整方法与验证信号"] : ["含义", "依据", "具体表现", "验证与运用"], evidenceRefs: ["有效证据编号1", "有效证据编号2"], evidenceExplanation: ["推导说明1", "推导说明2"], constructiveExpression: "更容易发挥的关系条件", pressureExpression: "需要共同调整的互动方式", timing: [{ period: "证据明确的阶段", theme: "主题", evidenceRefs: ["有效证据编号"], opportunity: "可把握", caution: "需留意" }], reflectionQuestions: ["问题1", "问题2"], actions: [{ horizon: "时间范围", title: "行动", detail: "步骤与观察信号" }, { horizon: "时间范围", title: "行动", detail: "步骤与复盘方式" }] } },
+      user: { ...context, chapterId: id, chapterTitle: chapterTitles[id], requiredJsonShape: { id, title: chapterTitles[id], headline: id === "health" ? "用一句完整结论概括健康、作息与压力恢复重点" : "用一句完整结论概括本章重点", narrative: args.kind === "compatibility" ? ["关系结构", "双方依据", "具体生活场景", "调整方法与验证信号"] : ["含义", "依据", "具体表现", "验证与运用"], evidenceRefs: ["有效证据编号1", "有效证据编号2"], evidenceExplanation: ["推导说明1", "推导说明2"], constructiveExpression: "更容易发挥的关系条件", pressureExpression: "需要共同调整的互动方式", timing: [{ period: "证据明确的阶段", theme: "主题", evidenceRefs: ["有效证据编号"], opportunity: "可把握", caution: "需留意" }], reflectionQuestions: ["问题1", "问题2"], actions: [{ horizon: "时间范围", title: "行动", detail: "步骤与观察信号" }, { horizon: "时间范围", title: "行动", detail: "步骤与复盘方式" }] } },
     })),
   ];
   const outputs: unknown[] = [];
@@ -692,7 +708,7 @@ async function requestSiliconFlowReport(args: {
         requiredJsonShape: {
           id,
           title: chapterTitles[id],
-          headline: "本章核心判断",
+          headline: id === "health" ? "用一句完整结论概括健康、作息与压力恢复重点" : "用一句完整结论概括本章重点",
           narrative: ["含义", "依据", "具体表现", "验证与运用"],
           evidenceRefs: ["有效证据编号1", "有效证据编号2"],
           evidenceExplanation: ["证据如何支持判断1", "证据如何支持判断2"],

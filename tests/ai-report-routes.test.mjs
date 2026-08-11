@@ -18,7 +18,7 @@ function mockReport(kind) {
       { title: "行动准备", conclusion: paragraph, evidenceRefs: refs },
     ],
     chapters: chapters.map(([id, title]) => ({
-      id, title, headline: `${title}：从盘面趋势回到现实选择`,
+      id, title, headline: id === "health" ? "本章核心判断" : `${title}：从盘面趋势回到现实选择`,
       narrative: kind === "compatibility" ? [paragraph.slice(0, 90), paragraph.slice(0, 90)] : [paragraph, paragraph, paragraph, paragraph],
       evidenceRefs: refs,
       evidenceExplanation: ["第一条证据说明本章的结构起点。", "第二条证据用于交叉校正，避免单点判断。"],
@@ -111,6 +111,11 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
       assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.length === 4), true);
       assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.every((paragraph) => paragraph.length >= 65 && paragraph.length <= 95)), true);
       assert.equal(result.aiReport.chapters.some((chapter) => chapter.id === "timing"), false);
+      const healthChapter = result.aiReport.chapters.find((chapter) => chapter.id === "health");
+      assert.ok(healthChapter);
+      assert.doesNotMatch(healthChapter.headline, /本章核心判断|健康分析|健康状况/);
+      assert.ok(healthChapter.headline.length >= 12);
+      assert.match(healthChapter.headline, /[。！？]$/);
       if (path.includes("/bazi")) baziReport = result.aiReport;
     }
     const valid = new Set(result.aiReport.evidenceCatalog.map((item) => item.id));
