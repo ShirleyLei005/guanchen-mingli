@@ -834,7 +834,7 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
         <section><small>分析边界</small><ul>{report.boundaries.map((item, index) => <li key={`b-${index}`}>{item}</li>)}</ul></section>
       </footer>
       <section className="guanchen-bottom-cta">
-        <div><small>看完报告，还有具体问题？</small><h3>把现实处境告诉观辰，再沿着这张命盘深入分析。</h3><p>事业选择、关系互动、关键决定都可以继续问；每次回答 400—600 字，成功后扣 2 积分。</p></div>
+        <div><small>看完报告，还有具体问题？</small><h3>把现实处境告诉观辰，再沿着这张命盘深入分析。</h3><p>事业选择、关系互动、关键决定都可以继续问。</p></div>
         <button type="button" onClick={openGuanchenConsultation}><span>观辰解析</span><small>命盘详询 2积分</small></button>
       </section>
     </section>
