@@ -17,6 +17,12 @@ function displayTime(value: string) {
   return value ? value.replace("T", " ").slice(0, 16) : "—";
 }
 
+function displayPlace(place: PlaceMatch) {
+  return [place.country, place.admin1, place.admin2, place.admin3, place.admin4, place.name]
+    .filter((item, index, all): item is string => Boolean(item) && all.indexOf(item) === index)
+    .join(" · ");
+}
+
 export function BirthFields({
   label,
   defaultPlace = "昆明",
@@ -138,11 +144,11 @@ export function BirthFields({
           </>
         )}
       </label>
-      <label className="measure-place">出生地区
+      <label className="measure-place">出生国家 / 省市区
         <input
           value={query}
           onChange={(event) => { resetResolved(); setPlace(null); setOptions([]); setQuery(event.target.value); }}
-          placeholder="输入出生城市或区县"
+          placeholder="例如：中国 云南省 曲靖市 麒麟区，或 Paris France"
           autoComplete="off"
         />
         {searching && <span className="measure-searching">正在匹配…</span>}
@@ -152,10 +158,10 @@ export function BirthFields({
               <button type="button" key={option.id} onClick={() => {
                 resetResolved();
                 setPlace(option);
-                setQuery([option.name, option.admin1, option.country].filter(Boolean).join(" · "));
+                setQuery(displayPlace(option));
                 setOptions([]);
               }}>
-                <span><b>{option.name}</b><small>{[option.admin1, option.country].filter(Boolean).join(" · ")}</small></span>
+                <span><b>{option.name}</b><small>{displayPlace(option)}</small></span>
                 <em>{option.latitude.toFixed(4)}°, {option.longitude.toFixed(4)}°</em>
               </button>
             ))}
@@ -165,7 +171,7 @@ export function BirthFields({
       {place && (
         <div className="measure-solar">
           <div><b>真太阳时校正</b><span>{solar ? "已完成" : "计算中…"}</span></div>
-          <p>{place.name} · {place.latitude.toFixed(4)}°, {place.longitude.toFixed(4)}° · {place.timezone}</p>
+          <p>{displayPlace(place)} · {place.latitude.toFixed(4)}°, {place.longitude.toFixed(4)}° · {place.timezone}</p>
           {solar && (
             <>
               {calendar === "lunar" && <p>农历已换算为阳历：{displayTime(solar.normalizedSolarDateTime)}</p>}

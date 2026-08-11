@@ -642,6 +642,10 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .reading-boundary { margin-top: 38px; padding: 26px 30px; background: #eee6d8; }
 .reading-boundary ul { margin: 16px 0 0; padding-left: 18px; color: #747873; font: 10px/1.85 system-ui, sans-serif; }
 .report-output { color: var(--ink); background: #f7f1e5; padding: 32px; }
+.knowledge-path { display: flex; flex-wrap: wrap; gap: 10px; max-width: 1280px; margin: 0 auto; padding: 34px 42px 0; }
+.knowledge-path a { padding: 10px 15px; color: #315247; background: #f2eadc; border: 1px solid #d9ccb7; font: 13px/1.4 system-ui,sans-serif; }
+.knowledge-source { max-width: 1280px; margin: 0 auto 70px; padding: 0 42px; color: #7b817c; font: 12px/1.8 system-ui,sans-serif; }
+.knowledge-source a { color: #8f6330; text-decoration: underline; }
 .ai-deep-report { margin-top: 34px; color: #2d3934; background: #faf5eb; border: 1px solid rgba(204,174,116,.62); }
 .ai-deep-report small { font-family: system-ui, sans-serif; }
 .ai-report-cover { padding: 54px 58px 58px; color: #fff; background: linear-gradient(125deg,#153d31,#265244); }
@@ -660,9 +664,13 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .ai-report-tabs { display: flex; padding: 0 38px; overflow-x: auto; border-bottom: 1px solid #dcd0bc; background: #f1e8d9; scrollbar-width: none; }
 .ai-report-tabs button { flex: 0 0 auto; padding: 20px 22px; color: #707872; background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; font-size: 15px; }
 .ai-report-tabs button.active { color: #173d32; border-bottom-color: #b88b4b; font-weight: 700; }
-.ai-report-tabs .ai-chat-tab { position: sticky; right: 0; z-index: 3; margin-left: auto; min-width: 150px; color: #fff; background: #1d493b; border-left: 1px solid #d0ad69; border-bottom-color: #d0ad69; box-shadow: -14px 0 24px rgba(42,53,47,.15); font-weight: 700; letter-spacing: .06em; }
+.ai-report-tabs .ai-chat-tab { position: sticky; right: 0; z-index: 3; display: grid; gap: 3px; margin-left: auto; min-width: 178px; padding: 13px 22px; color: #fff; background: #1d493b; border-left: 1px solid #d0ad69; border-bottom-color: #d0ad69; box-shadow: -14px 0 24px rgba(42,53,47,.15); font-weight: 700; letter-spacing: .06em; animation: guanchen-tab-glow 2.8s ease-in-out infinite; }
 .ai-report-tabs .ai-chat-tab::before { content: "✦"; margin-right: 8px; color: #e0bd76; }
+.ai-report-tabs .ai-chat-tab span { font-size: 16px; }
+.ai-report-tabs .ai-chat-tab small { color: #dfc98f; font-size: 10px; letter-spacing: 0; }
 .ai-report-tabs .ai-chat-tab:hover, .ai-report-tabs .ai-chat-tab.active { color: #173d32; background: #dfbd7c; border-bottom-color: #173d32; }
+.ai-report-tabs .ai-chat-tab.active small { color: #5c513e; }
+@keyframes guanchen-tab-glow { 0%,100% { box-shadow: -14px 0 24px rgba(42,53,47,.15),0 0 0 0 rgba(196,154,85,.25); } 50% { box-shadow: -14px 0 24px rgba(42,53,47,.15),0 0 0 7px rgba(196,154,85,0); } }
 .chart-chat-panel { padding: 58px; background: linear-gradient(135deg,#fbf6ed 0%,#f2e8d6 100%); border-top: 4px solid #c49a55; }
 .chart-chat-panel > header { max-width: 900px; }
 .chart-chat-panel > header small { color: #a87536; font: 700 12px/1.5 system-ui,sans-serif; letter-spacing: .06em; }
@@ -685,6 +693,20 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .chart-chat-compose button { min-width: 190px; padding: 0 24px; color: #fff; background: #21493d; border: 0; cursor: pointer; font-weight: 700; }
 .chart-chat-compose button:disabled { cursor: wait; opacity: .55; }
 .chart-chat-notice { margin: 14px 0 0; color: #9a4d3f; font: 13px/1.7 system-ui,sans-serif; }
+.guanchen-mini-wait { display: flex; align-items: center; gap: 18px; margin-top: 16px; padding: 16px 20px; color: #23473c; background: #eee5d5; border: 1px solid #d7c8ad; }
+.guanchen-mini-wait > div:last-child { display: grid; gap: 5px; }
+.guanchen-mini-wait b { font: 700 14px/1.5 system-ui,sans-serif; }
+.guanchen-mini-wait span { color: #88745a; font: 12px/1.5 system-ui,sans-serif; }
+.taoist-reader { position: relative; width: 62px; height: 54px; flex: 0 0 62px; }
+.taoist-hat { position: absolute; left: 18px; top: 1px; width: 26px; height: 9px; background: #1e463a; border-radius: 60% 60% 20% 20%; transform: rotate(-4deg); }
+.taoist-head { position: absolute; left: 24px; top: 8px; width: 15px; height: 15px; background: #d7b477; border-radius: 50%; }
+.taoist-robe { position: absolute; left: 17px; top: 20px; width: 29px; height: 28px; background: #295646; border-radius: 12px 12px 4px 4px; }
+.taoist-book { position: absolute; left: 6px; bottom: 0; display: flex; width: 50px; height: 22px; perspective: 90px; }
+.taoist-book b,.taoist-book em { width: 50%; background: #f7efd9; border: 1px solid #b99355; }
+.taoist-book b { transform: skewY(8deg); transform-origin: right bottom; }
+.taoist-book em { transform: skewY(-8deg); transform-origin: left bottom; animation: taoist-page 1.05s ease-in-out infinite; }
+@keyframes taoist-page { 0%,100% { transform: skewY(-8deg) rotateY(0); } 50% { transform: skewY(-8deg) rotateY(-72deg); } }
+@media (prefers-reduced-motion: reduce) { .ai-report-tabs .ai-chat-tab,.taoist-book em { animation: none; } }
 .ai-report-chapter { padding: 62px 58px; }
 .ai-report-chapter > header h3 { margin: 16px 0 4px; font-size: clamp(32px,3.5vw,46px); line-height: 1.35; font-weight: 400; }
 .ai-report-chapter > header h4 { max-width: 1000px; margin: 14px 0 34px; color: #8f6330; font-size: 21px; line-height: 1.7; font-weight: 500; }

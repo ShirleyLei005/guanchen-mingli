@@ -24,8 +24,8 @@ test("server renders the finished Guanchen product", async () => {
   assert.match(html, /观辰/);
   assert.match(html, /八字命盘/);
   assert.match(html, /紫微斗数/);
-  assert.match(html, /合盘分析/);
-  assert.match(html, /命盘问答/);
+  assert.match(html, /双人合盘/);
+  assert.match(html, /观辰解析/);
   assert.match(html, /真太阳时/);
   assert.doesNotMatch(html, /codex-preview|Building your site|react-loading-skeleton/i);
 });
@@ -34,8 +34,8 @@ test("each navigation item has its own renderable URL", async () => {
   const routes = [
     ["/bazi", /<h1>八字测算<\/h1>/],
     ["/ziwei", /<h1>紫微斗数测算<\/h1>/],
-    ["/match", /<h1>合盘测算<\/h1>/],
-    ["/chat", /<h1>命盘问答<\/h1>/],
+    ["/match", /<h1>双人合盘<\/h1>/],
+    ["/chat", /<h1>观辰解析<\/h1>/],
     ["/knowledge", /命理课堂/],
     ["/login", /登录观辰/],
   ];
@@ -69,6 +69,9 @@ test("measurement UX includes a visible wait state and full compatibility scope"
   assert.match(source, /正在生成准确命盘与完整报告/);
   assert.match(source, /无需选择方向，默认进行全维度合盘解析/);
   assert.match(source, /完整覆盖八项关系主题/);
+  assert.match(source, /小道士正在翻阅盘面/);
+  assert.match(source, /400—600 字/);
+  assert.match(source, /请观辰解析 · 2 积分/);
 });
 
 test("public report UI hides internal version and evidence identifiers", async () => {

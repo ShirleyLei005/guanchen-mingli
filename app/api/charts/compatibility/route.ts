@@ -1,6 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { generateCompatibility, type CompatibilityMode } from "../../../../lib/chart-engines";
 import { AiReportError, generateDeepReport } from "../../../../lib/ai-report";
+import { PRODUCT_COSTS } from "../../../../lib/domain";
+import { insufficientCredits, readCredits, setCreditCookie } from "../../../../lib/credits";
 
 type BirthPayload = {
   name?: string;
@@ -8,7 +10,7 @@ type BirthPayload = {
   gender?: "female" | "male";
 };
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as {
       mode?: CompatibilityMode;
@@ -21,6 +23,8 @@ export async function POST(request: Request) {
     if (!body.first?.trueSolarTime || !body.second?.trueSolarTime) {
       return NextResponse.json({ error: "MISSING_BIRTH_DATA" }, { status: 400 });
     }
+    const credits = readCredits(request);
+    if (body.deepReport && credits < PRODUCT_COSTS.compatibility) return insufficientCredits(credits, PRODUCT_COSTS.compatibility);
     const mode: CompatibilityMode = body.mode === "ziwei" ? "ziwei" : "bazi";
     const result = await generateCompatibility({
       mode,
@@ -48,7 +52,9 @@ export async function POST(request: Request) {
         question: [`分析对象：${firstName}与${secondName}。`, body.notes?.slice(0, 500)].filter(Boolean).join(" "),
       }), firstName, secondName);
     }
-    return NextResponse.json(result);
+    if (!body.deepReport) return NextResponse.json(result);
+    const remainingCredits = credits - PRODUCT_COSTS.compatibility;
+    return setCreditCookie(NextResponse.json({ ...result, creditCost: PRODUCT_COSTS.compatibility, creditBalance: remainingCredits }), remainingCredits);
   } catch (error) {
     return NextResponse.json(
       {

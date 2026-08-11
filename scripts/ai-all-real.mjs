@@ -19,8 +19,8 @@ const cases = [
     path: "/api/charts/compatibility",
     body: {
       mode: "bazi",
-      first: { trueSolarTime: "2000-01-01T12:00:00", gender: "male" },
-      second: { trueSolarTime: "2001-02-02T13:00:00", gender: "female" },
+      first: { name: "子安", trueSolarTime: "2000-01-01T12:00:00", gender: "male" },
+      second: { name: "清和", trueSolarTime: "2001-02-02T13:00:00", gender: "female" },
       topics: ["关系总览", "沟通模式", "共同成长"],
       notes: "虚构双盘测试样本：分析互动方式，不做确定性关系结论。",
       deepReport: true,
@@ -36,7 +36,7 @@ for (const item of selectedCases) {
   const response = await worker.fetch(
     new Request(`http://localhost${item.path}`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", cookie: "guanchen_credits=1000" },
       body: JSON.stringify(item.body),
     }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
@@ -57,6 +57,7 @@ for (const item of selectedCases) {
     chapterIds: result.aiReport.chapters.map((chapter) => chapter.id),
     directAnswerLength: result.aiReport.directAnswer.length,
     chapterLengths: result.aiReport.chapters.map((chapter) => chapter.narrative.join("").length),
+    narrativeLength: result.aiReport.chapters.flatMap((chapter) => chapter.narrative).join("").length,
     invalidEvidence: [...new Set(citations.filter((id) => !validEvidence.has(id)))],
   }));
 }

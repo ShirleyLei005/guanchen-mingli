@@ -2,11 +2,16 @@ export type PlaceMatch = {
   id: string;
   name: string;
   admin1?: string;
+  admin2?: string;
+  admin3?: string;
+  admin4?: string;
   country: string;
+  countryCode?: string;
+  featureCode?: string;
   latitude: number;
   longitude: number;
   timezone: string;
-  source: "local" | "open-meteo";
+  source: "local" | "open-meteo" | "arcgis";
 };
 
 export type SolarTimeResult = {

@@ -1,17 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function SiteHeader({ active }: { active?: string }) {
   const [open, setOpen] = useState(false);
+  const [credits, setCredits] = useState(5);
   const items = [
     ["/", "首页", "home"],
     ["/bazi", "八字测算", "bazi"],
     ["/ziwei", "紫微斗数", "ziwei"],
-    ["/match", "合盘测算", "match"],
+    ["/match", "双人合盘", "match"],
     ["/knowledge", "命理课堂", "knowledge"],
   ];
+
+  useEffect(() => {
+    const refresh = () => void fetch("/api/credits")
+      .then((response) => response.json())
+      .then((data: { credits?: number }) => Number.isFinite(data.credits) && setCredits(Number(data.credits)))
+      .catch(() => undefined);
+    refresh();
+    const update = (event: Event) => setCredits(Number((event as CustomEvent<number>).detail));
+    window.addEventListener("guanchen:credits", update);
+    return () => window.removeEventListener("guanchen:credits", update);
+  }, []);
 
   return (
     <header className="sub-nav">
@@ -28,7 +40,7 @@ export function SiteHeader({ active }: { active?: string }) {
       </nav>
       <div className="sub-account">
         <Link href="/login">登录</Link>
-        <Link className="sub-credit" href="/login">5 体验积分</Link>
+        <Link className="sub-credit" href="/login">{credits} 积分</Link>
         <button aria-label="打开菜单" aria-expanded={open} onClick={() => setOpen((value) => !value)}>☰</button>
       </div>
     </header>

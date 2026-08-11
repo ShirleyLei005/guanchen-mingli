@@ -19,7 +19,7 @@ function mockReport(kind) {
     ],
     chapters: chapters.map(([id, title]) => ({
       id, title, headline: `${title}：从盘面趋势回到现实选择`,
-      narrative: [paragraph, paragraph, paragraph, paragraph],
+      narrative: kind === "compatibility" ? [paragraph.slice(0, 90), paragraph.slice(0, 90)] : [paragraph, paragraph, paragraph, paragraph],
       evidenceRefs: refs,
       evidenceExplanation: ["第一条证据说明本章的结构起点。", "第二条证据用于交叉校正，避免单点判断。"],
       constructiveExpression: "当资源、边界与行动节奏一致时，这组倾向更容易表现为稳定、清晰和可持续的能力。",
@@ -42,7 +42,7 @@ async function getWorkerWithDeepSeekMock() {
     const context = JSON.parse(request.messages[1].content);
     if (context.task === "chart_question") {
       return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({
-        answer: `${paragraph.repeat(5)}具体到现实行动，可以先记录触发情境、自己的第一反应和实际结果，再对照盘面证据做复盘。`,
+        answer: `${paragraph.repeat(5)}具体到现实行动，可以先记录触发情境、自己的第一反应和实际结果，再对照盘面证据做复盘。`.slice(0, 520),
         evidenceRefs: [context.evidenceCatalog[0].id, context.evidenceCatalog[1].id],
         actions: ["记录三次真实事件与反馈", "一个月后复盘选择是否更清晰"],
         boundary: "命盘提示趋势，不替代现实判断。",
@@ -69,9 +69,9 @@ async function getWorkerWithDeepSeekMock() {
   return (await import(workerUrl.href)).default;
 }
 
-async function call(worker, path, body) {
+async function call(worker, path, body, credits = 1000) {
   return worker.fetch(
-    new Request(`http://localhost${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+    new Request(`http://localhost${path}`, { method: "POST", headers: { "content-type": "application/json", cookie: `guanchen_credits=${credits}` }, body: JSON.stringify(body) }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
     { waitUntil() {}, passThroughOnException() {} },
   );
@@ -91,7 +91,9 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
     assert.equal(result.aiReport.provider, "deepseek");
     assert.equal(result.aiReport.model, "deepseek-v4-flash");
     assert.equal(result.aiReport.chapters.length, path.includes("compatibility") ? 6 : 7);
-    assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.length === 4), true);
+    assert.equal(result.creditCost, path.includes("compatibility") ? 10 : 5);
+    assert.equal(result.creditBalance, path.includes("compatibility") ? 990 : 995);
+    assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.length === (path.includes("compatibility") ? 2 : 4)), true);
     if (!path.includes("compatibility")) {
       assert.equal(result.aiReport.chapters.every((chapter) => chapter.timing.length === 4), true);
       assert.equal(result.aiReport.chapters.every((chapter) => chapter.timing.slice(1).every((item) => /流年/.test(item.period))), true);
@@ -100,13 +102,27 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
     const cited = result.aiReport.chapters.flatMap((chapter) => [...chapter.evidenceRefs, ...chapter.timing.flatMap((item) => item.evidenceRefs)]);
     assert.equal(cited.every((id) => valid.has(id)), true);
     if (path.includes("compatibility")) {
+      const narrativeLength = result.aiReport.chapters.flatMap((chapter) => chapter.narrative).join("").length;
+      assert.ok(narrativeLength >= 1000 && narrativeLength <= 1200);
       assert.match(result.aiReport.directAnswer, /子安与清和/);
       assert.doesNotMatch(result.aiReport.directAnswer, /第一方|第二方/);
     }
   }
 });
 
-test("chart report dialogue answers at least 500 characters and charges two credits only on success", async () => {
+test("new test registrations receive five credits without resetting an existing balance", async () => {
+  const worker = await getWorkerWithDeepSeekMock();
+  const registration = await worker.fetch(
+    new Request("http://localhost/api/credits/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "new@example.com", password: "123456" }) }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(registration.status, 200);
+  assert.deepEqual(await registration.json(), { status: "success", credits: 5, isNew: true });
+  assert.match(registration.headers.get("set-cookie") || "", /guanchen_credits=5/);
+});
+
+test("Guanchen analysis answers 400-600 characters and charges two credits only on success", async () => {
   const worker = await getWorkerWithDeepSeekMock();
   const report = mockReport("bazi");
   report.evidenceCatalog = [{ id: "B001", text: "四柱测试依据" }, { id: "B003", text: "五行结构测试依据" }];
@@ -115,19 +131,19 @@ test("chart report dialogue answers at least 500 characters and charges two cred
     question: "未来一年事业上应该优先准备什么？",
     report,
     history: [],
-  });
+  }, 5);
   assert.equal(response.status, 200);
   const result = await response.json();
   assert.equal(result.creditCost, 2);
   assert.equal(result.remainingCredits, 3);
-  assert.ok(result.answer.length >= 500);
+  assert.ok(result.answer.length >= 400 && result.answer.length <= 600);
   assert.deepEqual(result.evidenceRefs, ["B001", "B003"]);
-  assert.match(response.headers.get("set-cookie") || "", /guanchen_test_credits=3/);
+  assert.match(response.headers.get("set-cookie") || "", /guanchen_credits=3/);
 
   const insufficient = await worker.fetch(
     new Request("http://localhost/api/charts/chat", {
       method: "POST",
-      headers: { "content-type": "application/json", cookie: "guanchen_test_credits=1" },
+      headers: { "content-type": "application/json", cookie: "guanchen_credits=1" },
       body: JSON.stringify({ kind: "bazi", question: "继续追问", report, history: [] }),
     }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },

@@ -14,8 +14,8 @@ type ChartResult = {
 const products = [
   { id: "bazi", stamp: "命", intent: "想理解天赋、惯性与长期节奏", kicker: "先看人生全局", title: "八字命盘", subtitle: "从时间结构看性格、优势与阶段趋势", cost: 5 },
   { id: "ziwei", stamp: "星", intent: "想看事业、关系等具体人生领域", kicker: "再看具体领域", title: "紫微斗数", subtitle: "从十二宫位理解关系、事业与当下课题", cost: 5 },
-  { id: "match", stamp: "合", intent: "想理解一段重要关系的互动模式", kicker: "理解重要关系", title: "合盘分析", subtitle: "看见两个人的互补、压力与共同成长", cost: 10 },
-  { id: "chat", stamp: "问", intent: "已有命盘，想结合现实问题继续讨论", kicker: "带着问题深入", title: "命盘问答", subtitle: "围绕固定命盘，厘清选择而非索取答案", cost: 2 },
+  { id: "match", stamp: "合", intent: "想理解一段重要关系的互动模式", kicker: "理解重要关系", title: "双人合盘", subtitle: "看见两个人的互补、压力与共同成长", cost: 10 },
+  { id: "chat", stamp: "问", intent: "已有命盘，想结合现实问题继续讨论", kicker: "带着问题深入", title: "观辰解析", subtitle: "围绕固定命盘，厘清选择而非索取答案", cost: 2 },
 ] as const;
 
 const topics: Record<Product, string[]> = {
@@ -74,6 +74,15 @@ export function MingliApp() {
 
   const current = useMemo(() => products.find((item) => item.id === active)!, [active]);
   const effectiveDate = solarTime?.trueSolarTime.slice(0, 16) ?? date;
+
+  useEffect(() => {
+    const update = (event: Event) => setCredits(Number((event as CustomEvent<number>).detail));
+    void fetch("/api/credits").then((response) => response.json()).then((data: { credits?: number }) => {
+      if (Number.isFinite(data.credits)) setCredits(Number(data.credits));
+    }).catch(() => undefined);
+    window.addEventListener("guanchen:credits", update);
+    return () => window.removeEventListener("guanchen:credits", update);
+  }, []);
 
   useEffect(() => {
     if (place || placeQuery.trim().length < 2) {
@@ -191,7 +200,7 @@ export function MingliApp() {
           <Link href="/" onClick={() => setMobileNav(false)}>首页</Link>
           <a href="/bazi">八字测算</a>
           <a href="/ziwei">紫微斗数</a>
-          <a href="/match">合盘测算</a>
+          <a href="/match">双人合盘</a>
           <a href="/knowledge">命理课堂</a>
         </nav>
         <div className="account-actions">
@@ -216,10 +225,10 @@ export function MingliApp() {
               <small>看具体领域</small><strong>紫微斗数测算</strong><span>→</span>
             </a>
             <a className="hero-product-btn" href="/match">
-              <small>看关系互动</small><strong>合盘测算</strong><span>→</span>
+              <small>看关系互动</small><strong>双人合盘</strong><span>→</span>
             </a>
           </div>
-          <div className="trust-row"><span>基础排盘免费</span><span>每项解读有盘面依据</span><span>不作宿命式断言</span></div>
+          <div className="trust-row"><span>新用户赠 5 积分</span><span>每项解读有盘面依据</span><span>不作宿命式断言</span></div>
         </div>
         <div className="hero-chart" aria-hidden="true">
           <div className="chart-ring">
@@ -315,11 +324,11 @@ export function MingliApp() {
                   <input type="datetime-local" value={date} onChange={(event) => { setSolarTime(null); setDate(event.target.value); }} />
                 {calendar === "lunar" && <small className="field-help">正式排盘会先在服务端校验闰月并换算阳历；当前页面仅演示时间与地点校正链。</small>}
               </label>
-              <label className="place-field">出生地点
+              <label className="place-field">出生国家 / 省市区
                 <input
                   value={placeQuery}
                   onChange={(event) => { setSolarTime(null); setPlace(null); setPlaceOptions([]); setPlaceQuery(event.target.value); }}
-                  placeholder="输入城市或区县，例如：云南昆明"
+                  placeholder="输入国家、省、市或区县，例如：中国 云南省 曲靖市 麒麟区"
                   autoComplete="off"
                   aria-autocomplete="list"
                 />
@@ -328,7 +337,7 @@ export function MingliApp() {
                   <div className="place-options" role="listbox">
                     {placeOptions.map((option) => (
                       <button key={option.id} onClick={() => selectPlace(option)} role="option" aria-selected="false">
-                        <b>{option.name}</b><span>{[option.admin1, option.country].filter(Boolean).join(" · ")}</span>
+                        <b>{option.name}</b><span>{[option.country, option.admin1, option.admin2, option.admin3, option.admin4].filter(Boolean).join(" · ")}</span>
                         <em>{option.latitude.toFixed(4)}°, {option.longitude.toFixed(4)}°</em>
                       </button>
                     ))}

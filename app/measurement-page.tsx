@@ -24,14 +24,14 @@ const configs = {
     topics: ["命盘总览", "事业迁移", "财富田宅", "关系情感", "自我成长", "流年趋势", "合作社交", "决策参考"],
   },
   match: {
-    title: "合盘测算",
+    title: "双人合盘",
     eyebrow: "双人结构 · 互动模式 · 共同成长",
     intro: "分别填写双方出生资料，理解两个人如何互相触发、支持与磨合，不用单一分数裁决关系。",
     cost: 10,
     topics: ["关系总览", "沟通模式", "情感表达", "长期发展", "压力应对", "家庭协作", "共同成长", "现实建议"],
   },
   chat: {
-    title: "命盘问答",
+    title: "观辰解析",
     eyebrow: "固定命盘 · 连续追问 · 现实选择",
     intro: "建立固定命盘后，围绕工作、感情、关系与时间节点继续提问，让每一轮讨论都回到现实行动。",
     cost: 2,
@@ -53,6 +53,11 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [matchMode, setMatchMode] = useState<CompatibilityMode>("bazi");
   const [chartResult, setChartResult] = useState<BaziChartResult | ZiweiChartResult | CompatibilityResult | null>(null);
+
+  function syncCredits(data: unknown) {
+    const balance = (data as { creditBalance?: number }).creditBalance;
+    if (Number.isFinite(balance)) window.dispatchEvent(new CustomEvent("guanchen:credits", { detail: Number(balance) }));
+  }
 
   useEffect(() => {
     if (!loading || (kind !== "bazi" && kind !== "ziwei" && kind !== "match")) return;
@@ -132,6 +137,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
         });
         const data = await response.json() as BaziChartResult | ZiweiChartResult | { error?: string; message?: string };
         if (!response.ok || "error" in data) throw new Error("message" in data && data.message ? data.message : "排盘服务暂时不可用，请稍后重试。");
+        syncCredits(data);
         setChartResult(data as BaziChartResult | ZiweiChartResult);
       } else if (kind === "match" && secondaryBirth) {
         const response = await fetch("/api/charts/compatibility", {
@@ -148,6 +154,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
         });
         const data = await response.json() as CompatibilityResult | { error?: string; message?: string };
         if (!response.ok || "error" in data) throw new Error("message" in data && data.message ? data.message : "合盘服务暂时不可用，请稍后重试。");
+        syncCredits(data);
         setChartResult(data as CompatibilityResult);
       }
       setSubmitted(true);
@@ -233,7 +240,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
         <button className="measure-submit" disabled={loading} onClick={() => void submit()}>
           {loading
             ? ["正在校正并排盘…", "正在识别命盘主轴…", "正在生成深度分析…", "正在核对盘面依据…"][loadingStage]
-            : "开始测算"} <span>{kind === "bazi" || kind === "ziwei" || kind === "match" ? "生成命盘与 AI 深度解读" : `完整专题 ${config.cost} 积分`}</span> →
+            : kind === "match" ? "开始解析" : "开始测算"} <span>{kind === "match" ? "10 积分 · 完整双人合盘" : kind === "bazi" || kind === "ziwei" ? "5 积分 · 命盘与深度解读" : `完整专题 ${config.cost} 积分`}</span> →
         </button>
         {loading && (
           <section className="measurement-wait" aria-live="polite">
@@ -245,7 +252,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
             <p>{["正在核对出生地点、时区与真太阳时。", "排盘已建立，正在识别命盘主轴。", "DeepSeek 正在撰写通俗、详细的解读。", "正在核对章节完整性与盘面依据。"][loadingStage]} 请保持页面打开，不要重复提交。</p>
           </section>
         )}
-        <p className="measure-submit-help">点击后将使用已校正的真太阳时生成命盘；基础排盘与本页解读不扣积分。</p>
+        <p className="measure-submit-help">点击后将使用已校正的真太阳时生成命盘；八字与紫微扣除 5 积分，双人合盘扣除 10 积分，生成失败不扣积分。</p>
       </section>
 
       {submitted && primaryBirth && (
@@ -258,7 +265,7 @@ export function MeasurementPage({ kind }: { kind: MeasurementKind }) {
             <article><small>出生地点</small><b>{primaryBirth.place.name}</b><span>{primaryBirth.place.latitude.toFixed(4)}°, {primaryBirth.place.longitude.toFixed(4)}°</span></article>
             <article><small>历史时区</small><b>{primaryBirth.place.timezone}</b><span>UTC {primaryBirth.solarTime.timezoneOffsetMinutes / 60 >= 0 ? "+" : ""}{primaryBirth.solarTime.timezoneOffsetMinutes / 60}</span></article>
             <article><small>真太阳时</small><b>{primaryBirth.solarTime.trueSolarTime.replace("T", " ").slice(0, 16)}</b><span>总修正 {primaryBirth.solarTime.totalCorrectionMinutes} 分钟</span></article>
-            <article><small>报告方向</small><b>{kind === "match" ? "全维度合盘解析" : selected.join(" · ")}</b><span>{kind === "match" ? "完整覆盖八项关系主题" : "本页基础解读免费"}</span></article>
+            <article><small>报告方向</small><b>{kind === "match" ? "全维度合盘解析" : selected.join(" · ")}</b><span>{kind === "match" ? "完整覆盖八项关系主题" : "命盘与深度解读已生成"}</span></article>
           </div>
           {chartResult?.kind === "bazi" && <BaziResult result={chartResult} />}
           {chartResult?.kind === "ziwei" && <ZiweiResult result={chartResult} />}
@@ -633,6 +640,7 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
   const [activeId, setActiveId] = useState(report.chapters[0]?.id || "overview");
   const [chatQuestion, setChatQuestion] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatElapsed, setChatElapsed] = useState(0);
   const [chatNotice, setChatNotice] = useState("");
   const [chatCredits, setChatCredits] = useState(5);
   const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string; actions?: string[] }>>([]);
@@ -648,6 +656,15 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
       })
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (!chatLoading) {
+      setChatElapsed(0);
+      return;
+    }
+    const timer = window.setInterval(() => setChatElapsed((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [chatLoading]);
 
   async function askChartQuestion() {
     const question = chatQuestion.trim();
@@ -676,7 +693,9 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
       });
       const data = await response.json() as { answer?: string; actions?: string[]; message?: string; creditCost?: number; remainingCredits?: number };
       if (!response.ok || !data.answer) throw new Error(data.message || "AI 暂时无法回答，请稍后重试。");
-      setChatCredits(Number.isFinite(data.remainingCredits) ? Number(data.remainingCredits) : Math.max(0, chatCredits - (data.creditCost || 2)));
+      const nextCredits = Number.isFinite(data.remainingCredits) ? Number(data.remainingCredits) : Math.max(0, chatCredits - (data.creditCost || 2));
+      setChatCredits(nextCredits);
+      window.dispatchEvent(new CustomEvent("guanchen:credits", { detail: nextCredits }));
       setChatMessages((current) => [...current, { role: "user", text: question }, { role: "assistant", text: data.answer!, actions: data.actions }]);
       setChatQuestion("");
     } catch (error) {
@@ -711,28 +730,29 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
         ))}</div>
       </section>
 
-      <nav className="ai-report-tabs" aria-label="AI 深度报告章节">
+      <nav className="ai-report-tabs" aria-label="观辰深度报告章节">
         {report.chapters.map((chapter) => (
           <button type="button" key={chapter.id} className={chapter.id === active.id ? "active" : ""} onClick={() => setActiveId(chapter.id)}>{chapter.title}</button>
         ))}
-        <button type="button" className={chatActive ? "active ai-chat-tab" : "ai-chat-tab"} onClick={() => setActiveId("ai_chat")}>AI 对话</button>
+        <button type="button" className={chatActive ? "active ai-chat-tab" : "ai-chat-tab"} onClick={() => setActiveId("ai_chat")}><span>观辰解析</span><small>问这张盘 · 2 积分</small></button>
       </nav>
 
       {chatActive ? (
         <section className="chart-chat-panel">
-          <header><small>基于当前命盘继续追问</small><h3>关于这张盘，你还想了解什么？</h3><p>AI 会结合本次排盘依据和前文结论，提供不少于 500 字的专业分析。每次成功回答消耗 2 积分，失败不扣积分。</p></header>
+          <header><small>基于当前命盘继续追问</small><h3>观辰解析</h3><p>围绕你的具体问题，结合本次盘面依据给出 400—600 字的专业解读。每次成功回答消耗 2 积分，失败不扣积分。</p></header>
           <div className="chart-chat-balance"><span>当前余额</span><b>{chatCredits} 积分</b></div>
           <div className="chart-chat-messages" aria-live="polite">
             {chatMessages.length === 0 ? (
               <div className="chart-chat-empty"><b>可以这样问</b><button type="button" onClick={() => setChatQuestion("未来两年事业上最值得提前准备什么？")}>未来两年事业上最值得提前准备什么？</button><button type="button" onClick={() => setChatQuestion("这张盘在亲密关系中最需要觉察的模式是什么？")}>亲密关系中最需要觉察什么？</button></div>
             ) : chatMessages.map((message, index) => (
-              <article key={`${message.role}-${index}`} className={message.role}><small>{message.role === "user" ? "你的问题" : "观辰 AI"}</small><p>{message.text}</p>{message.actions?.length ? <ul>{message.actions.map((action) => <li key={action}>{action}</li>)}</ul> : null}</article>
+              <article key={`${message.role}-${index}`} className={message.role}><small>{message.role === "user" ? "你的问题" : "观辰解析"}</small><p>{message.text}</p>{message.actions?.length ? <ul>{message.actions.map((action) => <li key={action}>{action}</li>)}</ul> : null}</article>
             ))}
           </div>
           <div className="chart-chat-compose">
             <textarea value={chatQuestion} onChange={(event) => setChatQuestion(event.target.value)} maxLength={500} placeholder="写下你的具体问题，背景越清楚，回答越有针对性。" />
-            <button type="button" disabled={chatLoading || !chatQuestion.trim()} onClick={() => void askChartQuestion()}>{chatLoading ? "正在结合命盘分析…" : "发送问题 · 2 积分"}</button>
+            <button type="button" disabled={chatLoading || !chatQuestion.trim()} onClick={() => void askChartQuestion()}>{chatLoading ? "观辰正在解析…" : "请观辰解析 · 2 积分"}</button>
           </div>
+          {chatLoading && <div className="guanchen-mini-wait" aria-live="polite"><div className="taoist-reader" aria-hidden="true"><i className="taoist-hat" /><i className="taoist-head" /><i className="taoist-robe" /><span className="taoist-book"><b /><em /></span></div><div><b>小道士正在翻阅盘面</b><span>{chatElapsed < 18 ? `预计还需 ${18 - chatElapsed} 秒` : "正在完成最后核对"}</span></div></div>}
           {chatNotice && <p className="chart-chat-notice">{chatNotice}</p>}
         </section>
       ) : <article className="ai-report-chapter">
