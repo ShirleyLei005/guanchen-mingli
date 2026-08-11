@@ -68,6 +68,9 @@ async function getWorkerWithDeepSeekMock(options = {}) {
         ],
       };
     }
+    if (context.chapterId === "health" && context.reportKind !== "compatibility") {
+      output = { ...output, narrative: ["注意作息。"] };
+    }
     return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify(output) } }] });
   };
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -104,6 +107,8 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
     if (!path.includes("compatibility")) {
       assert.equal(result.aiReport.chapters.every((chapter) => chapter.timing.length === 0), true);
       assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.join("").length <= 400), true);
+      assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.length === 4), true);
+      assert.equal(result.aiReport.chapters.every((chapter) => chapter.narrative.every((paragraph) => paragraph.length >= 65 && paragraph.length <= 95)), true);
       assert.equal(result.aiReport.chapters.some((chapter) => chapter.id === "timing"), false);
       if (path.includes("/bazi")) baziReport = result.aiReport;
     }
@@ -127,6 +132,7 @@ test("Bazi, Ziwei and compatibility routes all generate evidence-grounded DeepSe
   assert.equal(timing.chapter.title, "流年运势及关键节点");
   assert.equal(timing.chapter.timing.length, 4);
   assert.ok(timing.chapter.narrative.join("").length <= 600);
+  assert.equal(timing.chapter.narrative.every((paragraph) => paragraph.length >= 100 && paragraph.length <= 145), true);
 });
 
 test("new test registrations receive five credits without resetting an existing balance", async () => {
