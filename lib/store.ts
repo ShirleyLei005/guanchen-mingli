@@ -6,6 +6,16 @@ export type StoreUser = {
   displayName: string;
   passwordHash: string;
   status: string;
+  emailVerifiedAt: string | null;
+};
+
+export type EmailVerificationRow = {
+  userId: string;
+  codeHash: string;
+  attempts: number;
+  expiresAt: string;
+  completedAt: string | null;
+  resendAfter: string | null;
 };
 
 export type OrderRow = {
@@ -44,6 +54,12 @@ export interface AppStore {
   createSession(input: { tokenHash: string; userId: string; expiresAt: string }): Promise<void>;
   deleteSession(tokenHash: string): Promise<void>;
   getUserBySession(tokenHash: string): Promise<StoreUser | null>;
+  createEmailVerification(input: { id: string; userId: string; codeHash: string; expiresAt: string; resendAfter: string }): Promise<void>;
+  getEmailVerification(userId: string): Promise<EmailVerificationRow | null>;
+  incrementVerificationAttempt(userId: string): Promise<void>;
+  markEmailVerified(userId: string): Promise<void>;
+  recordRegistrationEvent(input: { id: string; ipHash: string; email: string; createdAt: string }): Promise<void>;
+  countRegistrationsByIp(ipHash: string, since: string): Promise<number>;
   ensureCreditAccount(userId: string): Promise<void>;
   getBalance(userId: string): Promise<number>;
   credit(userId: string, amount: number, meta: CreditMeta): Promise<{ applied: boolean; balanceAfter: number }>;
@@ -84,6 +100,7 @@ export class D1Store implements AppStore {
       displayName: row.display_name,
       passwordHash: row.password_hash ?? "",
       status: row.status,
+      emailVerifiedAt: row.email_verified_at ?? null,
     };
   }
 
@@ -140,6 +157,70 @@ export class D1Store implements AppStore {
       .bind(tokenHash, new Date().toISOString())
       .first<any>();
     return this.mapUser(row);
+  }
+
+  async createEmailVerification(input: { id: string; userId: string; codeHash: string; expiresAt: string; resendAfter: string }) {
+    await this.db
+      .prepare(`INSERT INTO email_verifications (id, user_id, code_hash, expires_at, attempts, resend_after)
+        VALUES (?, ?, ?, ?, 0, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+          code_hash = excluded.code_hash,
+          expires_at = excluded.expires_at,
+          attempts = 0,
+          completed_at = NULL,
+          resend_after = excluded.resend_after`)
+      .bind(input.id, input.userId, input.codeHash, input.expiresAt, input.resendAfter)
+      .run();
+  }
+
+  async getEmailVerification(userId: string) {
+    const row = await this.db
+      .prepare("SELECT user_id, code_hash, attempts, expires_at, completed_at, resend_after FROM email_verifications WHERE user_id = ?")
+      .bind(userId)
+      .first<{ user_id: string; code_hash: string; attempts: number; expires_at: string; completed_at: string | null; resend_after: string | null }>();
+    if (!row) return null;
+    return {
+      userId: row.user_id,
+      codeHash: row.code_hash,
+      attempts: Number(row.attempts),
+      expiresAt: row.expires_at,
+      completedAt: row.completed_at,
+      resendAfter: row.resend_after,
+    };
+  }
+
+  async incrementVerificationAttempt(userId: string) {
+    await this.db
+      .prepare("UPDATE email_verifications SET attempts = attempts + 1 WHERE user_id = ?")
+      .bind(userId)
+      .run();
+  }
+
+  async markEmailVerified(userId: string) {
+    const now = new Date().toISOString();
+    await this.db
+      .prepare("UPDATE users SET email_verified_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .bind(now, userId)
+      .run();
+    await this.db
+      .prepare("UPDATE email_verifications SET completed_at = ? WHERE user_id = ? AND completed_at IS NULL")
+      .bind(now, userId)
+      .run();
+  }
+
+  async recordRegistrationEvent(input: { id: string; ipHash: string; email: string; createdAt: string }) {
+    await this.db
+      .prepare("INSERT INTO registration_events (id, ip_hash, email, created_at) VALUES (?, ?, ?, ?)")
+      .bind(input.id, input.ipHash, input.email, input.createdAt)
+      .run();
+  }
+
+  async countRegistrationsByIp(ipHash: string, since: string) {
+    const row = await this.db
+      .prepare("SELECT COUNT(*) AS count FROM registration_events WHERE ip_hash = ? AND created_at > ?")
+      .bind(ipHash, since)
+      .first<{ count: number }>();
+    return Number(row?.count ?? 0);
   }
 
   async ensureCreditAccount(userId: string) {
@@ -269,6 +350,7 @@ export class D1Store implements AppStore {
 type MemorySession = { tokenHash: string; userId: string; expiresAt: string };
 type MemoryLedger = { balanceAfter: number; userId: string };
 type MemoryOrder = OrderRow;
+type MemoryRegistrationEvent = { ipHash: string; email: string; createdAt: string };
 
 export class MemoryStore implements AppStore {
   private users = new Map<string, StoreUser>();
@@ -279,6 +361,8 @@ export class MemoryStore implements AppStore {
   private orders = new Map<string, MemoryOrder>();
   private ordersByIdempotency = new Map<string, MemoryOrder>();
   private paymentEvents = new Map<string, { applied: boolean }>();
+  private emailVerifications = new Map<string, EmailVerificationRow>();
+  private registrationEvents: MemoryRegistrationEvent[] = [];
 
   private key(userId: string, idempotencyKey: string) {
     return `${userId}:${idempotencyKey}`;
@@ -293,7 +377,14 @@ export class MemoryStore implements AppStore {
   }
 
   async createUser(input: { id: string; email: string; displayName: string; passwordHash: string }) {
-    const user: StoreUser = { id: input.id, email: input.email, displayName: input.displayName, passwordHash: input.passwordHash, status: "active" };
+    const user: StoreUser = {
+      id: input.id,
+      email: input.email,
+      displayName: input.displayName,
+      passwordHash: input.passwordHash,
+      status: "active",
+      emailVerifiedAt: null,
+    };
     this.users.set(user.id, user);
     this.usersByEmail.set(user.email.toLowerCase(), user);
     return user;
@@ -311,6 +402,41 @@ export class MemoryStore implements AppStore {
     const session = this.sessions.get(tokenHash);
     if (!session || session.expiresAt <= new Date().toISOString()) return null;
     return this.users.get(session.userId) ?? null;
+  }
+
+  async createEmailVerification(input: { id: string; userId: string; codeHash: string; expiresAt: string; resendAfter: string }) {
+    this.emailVerifications.set(input.userId, {
+      userId: input.userId,
+      codeHash: input.codeHash,
+      attempts: 0,
+      expiresAt: input.expiresAt,
+      completedAt: null,
+      resendAfter: input.resendAfter,
+    });
+  }
+
+  async getEmailVerification(userId: string) {
+    return this.emailVerifications.get(userId) ?? null;
+  }
+
+  async incrementVerificationAttempt(userId: string) {
+    const verification = this.emailVerifications.get(userId);
+    if (verification) verification.attempts += 1;
+  }
+
+  async markEmailVerified(userId: string) {
+    const user = this.users.get(userId);
+    if (user) user.emailVerifiedAt = new Date().toISOString();
+    const verification = this.emailVerifications.get(userId);
+    if (verification) verification.completedAt = new Date().toISOString();
+  }
+
+  async recordRegistrationEvent(input: { id: string; ipHash: string; email: string; createdAt: string }) {
+    this.registrationEvents.push({ ipHash: input.ipHash, email: input.email, createdAt: input.createdAt });
+  }
+
+  async countRegistrationsByIp(ipHash: string, since: string) {
+    return this.registrationEvents.filter((event) => event.ipHash === ipHash && event.createdAt > since).length;
   }
 
   async ensureCreditAccount(userId: string) {

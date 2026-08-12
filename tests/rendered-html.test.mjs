@@ -38,6 +38,8 @@ test("each navigation item has its own renderable URL", async () => {
     ["/chat", /<h1>观辰解析<\/h1>/],
     ["/knowledge", /命理课堂/],
     ["/login", /登录观辰/],
+    ["/privacy", /<h1>隐私说明<\/h1>/],
+    ["/terms", /<h1>用户协议<\/h1>/],
   ];
 
   for (const [path, expected] of routes) {
@@ -150,6 +152,19 @@ test("main navigation removes the standalone chart question link", async () => {
   ]);
   assert.doesNotMatch(headerSource, /\["\/chat",\s*"命盘问答"/);
   assert.doesNotMatch(homeSource, /className="nav-hot" href="\/chat"/);
+});
+
+test("footers link to real policy pages and no longer show contact", async () => {
+  const [chromeSource, homeSource] = await Promise.all([
+    readFile(new URL("../app/site-chrome.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/mingli-app.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(chromeSource, /href="\/privacy"/);
+  assert.match(chromeSource, /href="\/terms"/);
+  assert.doesNotMatch(chromeSource, /联系我们/);
+  assert.match(homeSource, /href="\/privacy"/);
+  assert.match(homeSource, /href="\/terms"/);
+  assert.doesNotMatch(homeSource, /联系我们/);
 });
 
 test("contains commercial data model and safety copy", async () => {

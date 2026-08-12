@@ -22,7 +22,7 @@ pnpm test
 
 - 移动端优先的完整商业落地页和交互式测算流程
 - 免费命盘预览、专题选择、积分扣减与沙箱充值
-- 邮箱账号注册/登录：未登录积分为 0；新用户注册即赠 5 积分，可解锁八字或紫微斗数完整报告
+- 邮箱账号注册/登录：未登录积分为 0；注册后邮箱验证通过，新用户获赠 5 积分，可解锁八字或紫微斗数完整报告
 - 沙箱支付：下单 → 模拟收银台 → 回调入账，订单、支付事件与不可变积分流水均幂等
 - 八字、紫微、合婚、连续追问四类产品入口
 - D1/Drizzle 商业数据模型与首版迁移
@@ -34,7 +34,9 @@ pnpm test
 ## 账号与支付
 
 - 账号保存在 D1（`users`、`sessions`），密码使用 PBKDF2 加盐哈希，会话使用 HttpOnly Cookie。
-- 未登录用户积分为 0；登录后新用户通过 `signup_gift` 账本条目获得 5 积分，重复注册不会重复发放。
+- 未登录用户积分为 0；新账号在邮箱验证通过后才通过 `signup_gift` 账本条目获得 5 积分，重复验证不会重复发放。
+- 防刷：注册页含隐藏蜜罐字段；同一 IP 24 小时内最多创建 10 个账号；6 位验证码 30 分钟有效，最多尝试 5 次，重发间隔 60 秒。
+- 邮件服务：配置 `RESEND_API_KEY` 与 `EMAIL_FROM` 后自动发送验证码邮件；本地验收可设 `ALLOW_DEBUG_VERIFICATION_CODE=true`，接口会返回 `debugCode` 供测试，生产环境请勿开启。
 - 支付当前为沙箱模式（`PAYMENT_PROVIDER=sandbox`）：`POST /api/payments/orders` 创建订单，`POST /api/payments/sandbox/confirm` 模拟用户确认，`POST /api/payments/webhook/sandbox` 模拟服务商回调。
 - 正式启用微信/支付宝时，设置 `PAYMENT_PROVIDER=wechat|alipay` 并配置对应商户密钥环境变量；回调验签在 `lib/payments.ts` 适配器中扩展，业务逻辑不依赖具体渠道。
 - 测试积分：登录后调用 `POST /api/sandbox/tester-credits`，`code` 见该路由常量。
@@ -52,7 +54,7 @@ pnpm test
 ## 数据与安全
 
 - `.openai/hosting.json` 声明 D1 逻辑绑定 `DB`。
-- `db/schema.ts` 是数据模型源文件，`drizzle/0001_commercial_core.sql` 与 `drizzle/0002_auth_payments.sql` 是迁移文件。
+- `db/schema.ts` 是数据模型源文件，`drizzle/0001_commercial_core.sql`、`drizzle/0002_auth_payments.sql` 与 `drizzle/0003_email_verification_anti_abuse.sql` 是迁移文件。
 - OpenAI 密钥只能放在服务端环境变量 `OPENAI_API_KEY` 中，不得写入源码或客户端包。
 - 出生资料、关系资料和对话正文不得写入访问日志。
 - 生产上线前必须接入正式身份系统、支付验签、字段加密、限流和大陆地区合规审查。

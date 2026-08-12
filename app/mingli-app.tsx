@@ -92,7 +92,12 @@ export function MingliApp() {
   const [solarLoading, setSolarLoading] = useState(false);
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState<ChartResult | null>(null);
-  const [session, setSession] = useState<{ authenticated: boolean; credits: number }>({ authenticated: false, credits: 0 });
+  const [session, setSession] = useState<{ authenticated: boolean; credits: number; displayName: string; email: string }>({
+    authenticated: false,
+    credits: 0,
+    displayName: "",
+    email: "",
+  });
   const [notice, setNotice] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
 
@@ -102,13 +107,23 @@ export function MingliApp() {
   useEffect(() => {
     const refresh = () => void fetch("/api/credits")
       .then((response) => response.json())
-      .then((data: { authenticated?: boolean; credits?: number }) => setSession({ authenticated: Boolean(data.authenticated), credits: Number(data.credits) || 0 }))
+      .then((data: { authenticated?: boolean; credits?: number; displayName?: string | null; email?: string | null }) => setSession({
+        authenticated: Boolean(data.authenticated),
+        credits: Number(data.credits) || 0,
+        displayName: data.displayName || "",
+        email: data.email || "",
+      }))
       .catch(() => undefined);
     refresh();
     const updateBalance = (event: Event) => setSession((current) => ({ ...current, credits: Number((event as CustomEvent<number>).detail) }));
     const updateSession = (event: Event) => {
-      const detail = (event as CustomEvent<{ authenticated?: boolean; credits?: number }>).detail;
-      setSession({ authenticated: Boolean(detail?.authenticated), credits: Number(detail?.credits) || 0 });
+      const detail = (event as CustomEvent<{ authenticated?: boolean; credits?: number; displayName?: string; email?: string }>).detail;
+      setSession({
+        authenticated: Boolean(detail?.authenticated),
+        credits: Number(detail?.credits) || 0,
+        displayName: detail?.displayName || "",
+        email: detail?.email || "",
+      });
     };
     window.addEventListener("guanchen:credits", updateBalance);
     window.addEventListener("guanchen:session", updateSession);
@@ -180,7 +195,7 @@ export function MingliApp() {
 
   function unlock() {
     if (!session.authenticated) {
-      setNotice("请先登录。登录后新用户可免费获得 5 积分，用于解锁八字或紫微斗数完整报告。");
+      setNotice("请先登录。注册并验证邮箱后，新用户可免费获得 5 积分，用于解锁八字或紫微斗数完整报告。");
       window.location.href = "/login?returnTo=/";
       return;
     }
@@ -210,11 +225,16 @@ export function MingliApp() {
           <a href="/knowledge">命理课堂</a>
         </nav>
         <div className="account-actions">
-          <a href="/login">登录</a>
           {session.authenticated ? (
-            <button className="credit-pill" onClick={openRecharge}><span>余</span>{session.credits} 积分</button>
+            <>
+              <span className="account-name" title={session.displayName || session.email}>{session.displayName || session.email}</span>
+              <button className="credit-pill" onClick={openRecharge}><span>余</span>{session.credits} 积分</button>
+            </>
           ) : (
-            <a className="credit-pill" href="/login"><span>礼</span>登录领 5 积分</a>
+            <>
+              <a href="/login">登录</a>
+              <a className="credit-pill" href="/login"><span>礼</span>注册领 5 积分</a>
+            </>
           )}
           <button className="menu-toggle" aria-label="打开菜单" aria-expanded={mobileNav} onClick={() => setMobileNav((value) => !value)}>☰</button>
         </div>
@@ -239,7 +259,7 @@ export function MingliApp() {
               <small>理解靠近与磨合方式</small><strong>双人合盘</strong><span>→</span>
             </a>
           </div>
-          <div className="trust-row"><span>新用户赠 5 积分</span><span>推演有据，脉络可寻</span><span>知命而行，不囿于命</span></div>
+          <div className="trust-row"><span>新用户验证赠 5 积分</span><span>推演有据，脉络可寻</span><span>知命而行，不囿于命</span></div>
         </div>
         <div className="hero-chart" aria-hidden="true">
           <div className="chart-ring">
@@ -449,7 +469,7 @@ export function MingliApp() {
       <footer>
         <div className="brand footer-brand"><GuanchenBrandMark /><span><strong>观辰</strong><small>东方命理 · 观势知行</small></span></div>
         <p>传统文化娱乐与自我反思参考，不构成医疗、投资、法律或其他专业建议。</p>
-        <div><a href="#top">隐私政策</a><a href="#top">用户协议</a><a href="#knowledge">联系我们</a></div>
+        <div><Link href="/privacy">隐私政策</Link><Link href="/terms">用户协议</Link></div>
         <small>© 2026 观辰 · 观天时，察人事，知进退</small>
       </footer>
 

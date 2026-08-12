@@ -23,8 +23,11 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({
     status: "success",
     isNew: false,
+    verificationRequired: !user.emailVerifiedAt,
+    displayName: user.displayName,
+    email: user.email,
     credits: await store.getBalance(user.id),
-    message: "登录成功",
+    message: user.emailVerifiedAt ? "登录成功" : "登录成功，请先验证邮箱领取 5 积分",
   });
   await issueSession(store, user.id, response);
   return response;

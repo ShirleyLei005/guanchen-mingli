@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 const timestamps = {
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -9,10 +9,19 @@ const timestamps = {
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull(),
+  passwordHash: text("password_hash").notNull().default(""),
   displayName: text("display_name").notNull().default("观辰用户"),
   status: text("status").notNull().default("active"),
+  emailVerifiedAt: text("email_verified_at"),
   ...timestamps,
 }, (table) => [uniqueIndex("users_email_idx").on(table.email)]);
+
+export const sessions = sqliteTable("sessions", {
+  tokenHash: text("token_hash").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [index("sessions_user_idx").on(table.userId)]);
 
 export const birthProfiles = sqliteTable("birth_profiles", {
   id: text("id").primaryKey(),
@@ -90,10 +99,31 @@ export const messages = sqliteTable("messages", {
 
 export const creditAccounts = sqliteTable("credit_accounts", {
   userId: text("user_id").primaryKey().references(() => users.id),
-  balance: integer("balance").notNull().default(5),
+  balance: integer("balance").notNull().default(0),
   version: integer("version").notNull().default(0),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const emailVerifications = sqliteTable("email_verifications", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  codeHash: text("code_hash").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  expiresAt: text("expires_at").notNull(),
+  completedAt: text("completed_at"),
+  resendAfter: text("resend_after"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("email_verifications_user_idx").on(table.userId),
+  index("email_verifications_expiry_idx").on(table.expiresAt),
+]);
+
+export const registrationEvents = sqliteTable("registration_events", {
+  id: text("id").primaryKey(),
+  ipHash: text("ip_hash").notNull(),
+  email: text("email").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [index("registration_events_ip_idx").on(table.ipHash, table.createdAt)]);
 
 export const creditLedger = sqliteTable("credit_ledger", {
   id: text("id").primaryKey(),

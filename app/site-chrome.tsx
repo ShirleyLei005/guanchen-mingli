@@ -7,7 +7,12 @@ import { RechargeModal } from "./recharge-modal";
 
 export function SiteHeader({ active }: { active?: string }) {
   const [open, setOpen] = useState(false);
-  const [session, setSession] = useState<{ authenticated: boolean; credits: number }>({ authenticated: false, credits: 0 });
+  const [session, setSession] = useState<{ authenticated: boolean; credits: number; displayName: string; email: string }>({
+    authenticated: false,
+    credits: 0,
+    displayName: "",
+    email: "",
+  });
   const items = [
     ["/", "首页", "home"],
     ["/bazi", "八字测算", "bazi"],
@@ -19,15 +24,25 @@ export function SiteHeader({ active }: { active?: string }) {
   useEffect(() => {
     const refresh = () => void fetch("/api/credits")
       .then((response) => response.json())
-      .then((data: { authenticated?: boolean; credits?: number }) => {
-        setSession({ authenticated: Boolean(data.authenticated), credits: Number(data.credits) || 0 });
+      .then((data: { authenticated?: boolean; credits?: number; displayName?: string | null; email?: string | null }) => {
+        setSession({
+          authenticated: Boolean(data.authenticated),
+          credits: Number(data.credits) || 0,
+          displayName: data.displayName || "",
+          email: data.email || "",
+        });
       })
       .catch(() => undefined);
     refresh();
     const updateBalance = (event: Event) => setSession((current) => ({ ...current, credits: Number((event as CustomEvent<number>).detail) }));
     const updateSession = (event: Event) => {
-      const detail = (event as CustomEvent<{ authenticated?: boolean; credits?: number }>).detail;
-      setSession({ authenticated: Boolean(detail?.authenticated), credits: Number(detail?.credits) || 0 });
+      const detail = (event as CustomEvent<{ authenticated?: boolean; credits?: number; displayName?: string; email?: string }>).detail;
+      setSession({
+        authenticated: Boolean(detail?.authenticated),
+        credits: Number(detail?.credits) || 0,
+        displayName: detail?.displayName || "",
+        email: detail?.email || "",
+      });
     };
     window.addEventListener("guanchen:credits", updateBalance);
     window.addEventListener("guanchen:session", updateSession);
@@ -39,7 +54,7 @@ export function SiteHeader({ active }: { active?: string }) {
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    window.dispatchEvent(new CustomEvent("guanchen:session", { detail: { authenticated: false, credits: 0 } }));
+    window.dispatchEvent(new CustomEvent("guanchen:session", { detail: { authenticated: false, credits: 0, displayName: "", email: "" } }));
     window.location.href = "/";
   }
 
@@ -61,14 +76,17 @@ export function SiteHeader({ active }: { active?: string }) {
         ))}
       </nav>
       <div className="sub-account">
-        <Link href="/login">登录</Link>
         {session.authenticated ? (
           <>
+            <span className="sub-user" title={session.displayName || session.email}>{session.displayName || session.email}</span>
             <button className="sub-credit" onClick={openRecharge}>{session.credits} 积分</button>
             <button className="sub-logout" onClick={() => void logout()}>退出</button>
           </>
         ) : (
-          <Link className="sub-credit" href="/login">登录领 5 积分</Link>
+          <>
+            <Link href="/login">登录</Link>
+            <Link className="sub-credit" href="/login">注册领 5 积分</Link>
+          </>
         )}
         <button aria-label="打开菜单" aria-expanded={open} onClick={() => setOpen((value) => !value)}>☰</button>
       </div>
@@ -82,7 +100,7 @@ export function SiteFooter() {
     <footer>
       <div className="brand footer-brand"><GuanchenBrandMark /><span><strong>观辰</strong><small>东方命理 · 观势知行</small></span></div>
       <p>传统文化娱乐与自我反思参考，不构成医疗、投资、法律或其他专业建议。</p>
-      <div><Link href="/knowledge">隐私说明</Link><Link href="/knowledge">用户协议</Link><Link href="/knowledge">联系我们</Link></div>
+      <div><Link href="/privacy">隐私说明</Link><Link href="/terms">用户协议</Link></div>
       <small>© 2026 观辰 · 观天时，察人事，知进退</small>
     </footer>
   );

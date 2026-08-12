@@ -687,7 +687,7 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
     const question = chatQuestion.trim();
     if (!question || chatLoading) return;
     if (!authenticated) {
-      setChatNotice("请先登录后再使用观辰解析，登录后新用户可获赠 5 积分。");
+      setChatNotice("请先登录后再使用观辰解析，注册并验证邮箱后新用户可获赠 5 积分。");
       requireLogin();
       return;
     }
@@ -731,7 +731,7 @@ function AiDeepReportView({ report, kind }: { report: AiDeepReport; kind: "bazi"
   async function unlockTimingReport() {
     if (timingLoading || kind === "compatibility") return;
     if (!authenticated) {
-      setTimingNotice("请先登录后再解锁流年分析，登录后新用户可获赠 5 积分。");
+      setTimingNotice("请先登录后再解锁流年分析，注册并验证邮箱后新用户可获赠 5 积分。");
       requireLogin();
       return;
     }

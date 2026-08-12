@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser, sha256Hex } from "./auth";
 import { getStore, StoreError, type StoreUser } from "./store";
 
-export const NEW_USER_CREDITS = 5;
-
 export type CreditState = {
   authenticated: boolean;
   credits: number;
@@ -26,7 +24,7 @@ export async function resolvePaidAccess(request: NextRequest) {
         {
           status: "error",
           code: "AUTH_REQUIRED",
-          message: "请先登录。登录后新用户可免费获得 5 积分，用于解锁八字或紫微斗数完整报告。",
+          message: "请先登录。注册并验证邮箱后，新用户可免费获得 5 积分，用于解锁八字或紫微斗数完整报告。",
         },
         { status: 401 },
       ),

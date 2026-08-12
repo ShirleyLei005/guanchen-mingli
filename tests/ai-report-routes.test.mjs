@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+process.env.ALLOW_DEBUG_VERIFICATION_CODE = "true";
+
 const paragraph = "命盘提供的是一种观察结构：先核对盘面中的动力如何相互支持，再把它放回当事人的经历、资源和现实选择中理解。优势与压力往往来自同一倾向，建设性表达需要清晰边界、持续练习和可复盘的行动；任何阶段提示都不能代替真实反馈与专业判断。";
 
 function mockReport(kind) {
@@ -98,7 +100,21 @@ async function registerUser(worker, email = "tester@example.com") {
   );
   const setCookie = response.headers.get("set-cookie") || "";
   const session = (setCookie.match(/guanchen_session=([^;]+)/) || [])[1];
-  return { cookie: `guanchen_session=${session}`, response, json: await response.json() };
+  const registration = await response.json();
+  if (!response.ok) return { cookie: `guanchen_session=${session}`, response, json: registration };
+  const code = registration.debugCode;
+  if (!code) throw new Error("Expected debug verification code in registration response");
+  const verifyResponse = await worker.fetch(
+    new Request("http://localhost/api/auth/verify-email", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: `guanchen_session=${session}` },
+      body: JSON.stringify({ code }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  if (!verifyResponse.ok) throw new Error("Verification failed in test setup");
+  return { cookie: `guanchen_session=${session}`, response, json: { ...registration, ...(await verifyResponse.json()) } };
 }
 
 async function grantTesterCredits(worker, cookie) {
