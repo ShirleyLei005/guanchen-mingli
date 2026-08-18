@@ -2,6 +2,8 @@
 
 面向中文用户的现代命理商业网站 MVP。首版覆盖八字、紫微斗数、八字合婚、固定命盘追问、积分包和支付沙箱。
 
+**在线访问：[https://guanchen.site](https://guanchen.site)**
+
 ## 本地启动
 
 需要 Node.js 22+ 与 pnpm。
