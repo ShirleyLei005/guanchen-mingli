@@ -354,6 +354,46 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
 .sub-credit, .sub-logout { font: 12px/1 system-ui, sans-serif; cursor: pointer; }
 .sub-logout { display: inline-block; opacity: .7; background: transparent; border: 0; color: inherit; padding: 8px 4px; }
 .sub-account .menu-toggle { display: none; border: 1px solid rgba(255,255,255,.3); background: transparent; color: #fff; padding: 8px 10px; }
+.account-menu { position: relative; }
+.account-menu > summary { cursor: pointer; list-style: none; }
+.account-menu > summary::-webkit-details-marker { display: none; }
+.account-menu > summary i { margin-left: 6px; font-style: normal; opacity: .7; }
+.account-menu[open] > summary i { display: inline-block; transform: rotate(180deg); }
+.account-menu > div { position: absolute; top: calc(100% + 15px); right: 0; z-index: 120; width: 150px; padding: 7px; color: var(--ink); background: #fffdf7; border: 1px solid rgba(23,37,31,.14); box-shadow: 0 18px 46px rgba(5,26,19,.24); }
+.account-menu > div:before { content: ""; position: absolute; right: 20px; top: -6px; width: 11px; height: 11px; background: #fffdf7; border-left: 1px solid rgba(23,37,31,.14); border-top: 1px solid rgba(23,37,31,.14); transform: rotate(45deg); }
+.account-menu > div a, .account-menu > div button { display: block; width: 100%; padding: 12px 13px; border: 0; color: #263a31; background: transparent; text-align: left; font: 600 13px/1.3 system-ui, sans-serif; cursor: pointer; }
+.account-menu > div a:hover, .account-menu > div button:hover { color: var(--pine); background: #f1ece1; }
+.home-account-menu > div { top: calc(100% + 20px); }
+
+.account-panel, .history-page { min-height: 680px; padding: 76px max(20px, 8vw) 100px; background: #f5f1e8; }
+.account-panel > header, .history-page > header { max-width: 760px; margin: 0 auto 42px; text-align: center; }
+.account-panel > header p, .history-page > header p { margin: 0 0 15px; color: #9b6f2e; font: 700 10px/1 system-ui, sans-serif; letter-spacing: .24em; }
+.account-panel > header h1, .history-page > header h1 { margin: 0; font-size: clamp(42px,5vw,62px); font-weight: 400; }
+.account-panel > header span, .history-page > header span { display: block; margin-top: 16px; color: #65716a; line-height: 1.8; }
+.account-form { max-width: 680px; margin: auto; padding: 38px 42px; background: #fffdf7; border: 1px solid var(--line); box-shadow: 0 18px 50px rgba(23,37,31,.08); }
+.account-form label { display: block; margin-bottom: 21px; color: #263a31; font: 700 13px/1.5 system-ui, sans-serif; }
+.account-form label small { display: block; margin-top: 3px; color: #7a837e; font-weight: 400; }
+.account-form .primary-btn { width: 100%; justify-content: center; color: #fff; background: var(--pine); }
+.email-verify-box { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 20px; padding: 18px; background: #faf3e4; border: 1px solid rgba(184,145,83,.42); }
+.email-verify-box b { grid-column: 1/-1; color: #795c32; }
+.email-verify-box input { margin: 0; }
+.email-verify-box button { padding: 10px 13px; color: #fff; background: var(--pine); border: 0; cursor: pointer; }
+.history-list { display: grid; gap: 18px; max-width: 920px; margin: auto; }
+.history-list > article { padding: 28px 32px; background: #fffdf7; border: 1px solid var(--line); }
+.history-list article > div:first-child { display: flex; justify-content: space-between; gap: 20px; color: #9b6f2e; font: 700 11px/1.4 system-ui, sans-serif; }
+.history-list time { color: #7a837e; font-weight: 500; }
+.history-list h2 { margin: 16px 0 10px; font-size: 28px; }
+.history-list article > p { color: #5d6962; line-height: 1.8; }
+.history-list summary { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--jade); cursor: pointer; font: 700 13px/1.4 system-ui, sans-serif; }
+.history-result { margin-top: 20px; padding: 22px; color: #4f5e56; background: #f7f2e8; line-height: 1.8; }
+.history-result ul { padding-left: 20px; }
+.history-result li { margin: 7px 0; }
+.history-result section + section { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 18px; }
+.history-result h3 { margin: 0 0 8px; color: var(--pine); font-size: 18px; }
+.history-result p { margin: 0; }
+.history-empty { display: grid; gap: 14px; max-width: 700px; margin: 0 auto; padding: 48px; text-align: center; color: #65716a; background: #fffdf7; border: 1px solid var(--line); }
+.history-empty b { color: var(--pine); font-size: 24px; }
+.history-empty a { color: #9b6f2e; font-weight: 700; }
 
 .measure-hero { padding: 78px 20px 58px; text-align: center; color: #fff; background: radial-gradient(circle at 78% 20%, #3f735e 0, var(--pine) 34%, var(--pine-dark) 78%); }
 .measure-hero > p, .knowledge-hero > p, .login-value > p, .measure-form-head > p, .measure-result > div:first-child > p { margin: 0 0 15px; color: #d7b878; font: 700 10px/1 system-ui, sans-serif; letter-spacing: .24em; }
@@ -1070,4 +1110,9 @@ footer > small { grid-column: 1/-1; text-align: center; opacity: .45; border-top
   .guanchen-bottom-cta button { flex-basis: auto; }
   .reading-timing h4 { min-height: 0; }
   .report-output { padding: 22px 16px; }
+  .account-form { padding: 28px 20px; }
+  .email-verify-box { grid-template-columns: 1fr; }
+  .email-verify-box b { grid-column: auto; }
+  .history-list > article { padding: 24px 20px; }
+  .history-list article > div:first-child { flex-direction: column; gap: 6px; }
 }

@@ -210,6 +210,11 @@ export function MingliApp() {
     window.dispatchEvent(new CustomEvent("guanchen:open-recharge"));
   }
 
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/";
+  }
+
   return (
     <main>
       <header className="nav-shell">
@@ -227,7 +232,10 @@ export function MingliApp() {
         <div className="account-actions">
           {session.authenticated ? (
             <>
-              <span className="account-name" title={session.displayName || session.email}>{session.displayName || session.email}</span>
+              <details className="account-menu home-account-menu">
+                <summary className="account-name" title={session.displayName || session.email}>{session.displayName || session.email}<i>⌄</i></summary>
+                <div><a href="/account">账号设置</a><a href="/history">测算历史</a><button onClick={() => void logout()}>退出登录</button></div>
+              </details>
               <button className="credit-pill" onClick={openRecharge}><span>余</span>{session.credits} 积分</button>
             </>
           ) : (

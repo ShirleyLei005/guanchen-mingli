@@ -3,6 +3,7 @@ import { runZiweiWorkflow } from "../../../../lib/ziwei-mcp-tools";
 import { AiReportError, generateDeepReport } from "../../../../lib/ai-report";
 import { PRODUCT_COSTS } from "../../../../lib/domain";
 import { insufficientCredits, purchaseIdempotencyKey, resolvePaidAccess } from "../../../../lib/credits";
+import { saveHistory } from "../../../../lib/history";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null) as {
@@ -19,6 +20,7 @@ export async function POST(request: NextRequest) {
       latitude?: number;
     };
     deepReport?: boolean;
+    name?: string;
   } | null;
   if (!body?.trueSolarTime || !["female", "male"].includes(body.gender ?? "") || !Array.isArray(body.topics)) {
     return NextResponse.json({ status: "error", message: "出生时间、性别或分析方向无效" }, { status: 400 });
@@ -57,6 +59,7 @@ export async function POST(request: NextRequest) {
       referenceId: idempotencyKey,
       idempotencyKey,
     });
+    await saveHistory(access!.store, access!.user, "ziwei", body, chart, `${body.name?.trim() || "我的"} · 紫微斗数`);
     return NextResponse.json({ ...chart, creditCost: PRODUCT_COSTS.ziwei_report, creditBalance: debited.balanceAfter });
   } catch (error) {
     return NextResponse.json(

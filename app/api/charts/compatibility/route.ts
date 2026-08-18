@@ -3,6 +3,7 @@ import { generateCompatibility, type CompatibilityMode } from "../../../../lib/c
 import { AiReportError, generateDeepReport } from "../../../../lib/ai-report";
 import { PRODUCT_COSTS } from "../../../../lib/domain";
 import { insufficientCredits, purchaseIdempotencyKey, resolvePaidAccess } from "../../../../lib/credits";
+import { saveHistory } from "../../../../lib/history";
 
 type BirthPayload = {
   name?: string;
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest) {
       referenceId: idempotencyKey,
       idempotencyKey,
     });
+    await saveHistory(access!.store, access!.user, "compatibility", body, result, `${body.first.name?.trim() || "第一方"} × ${body.second.name?.trim() || "第二方"} · 双人合盘`);
     return NextResponse.json({ ...result, creditCost: PRODUCT_COSTS.compatibility, creditBalance: debited.balanceAfter });
   } catch (error) {
     return NextResponse.json(

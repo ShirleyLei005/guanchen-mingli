@@ -78,9 +78,11 @@ export function SiteHeader({ active }: { active?: string }) {
       <div className="sub-account">
         {session.authenticated ? (
           <>
-            <span className="sub-user" title={session.displayName || session.email}>{session.displayName || session.email}</span>
+            <details className="account-menu">
+              <summary className="sub-user" title={session.displayName || session.email}>{session.displayName || session.email}<i>⌄</i></summary>
+              <div><Link href="/account">账号设置</Link><Link href="/history">测算历史</Link><button onClick={() => void logout()}>退出登录</button></div>
+            </details>
             <button className="sub-credit" onClick={openRecharge}>{session.credits} 积分</button>
-            <button className="sub-logout" onClick={() => void logout()}>退出</button>
           </>
         ) : (
           <>

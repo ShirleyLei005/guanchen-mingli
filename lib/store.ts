@@ -38,6 +38,16 @@ export type CreditMeta = {
   idempotencyKey: string;
 };
 
+export type MeasurementHistoryRow = {
+  id: string;
+  kind: string;
+  title: string;
+  summary: string;
+  input: unknown;
+  result: unknown;
+  createdAt: string;
+};
+
 export class StoreError extends Error {
   code: string;
   constructor(code: string, message: string) {
@@ -77,6 +87,9 @@ export interface AppStore {
   markOrderPaid(orderId: string, providerTradeNo: string, paidAt: string): Promise<OrderRow>;
   recordPaymentEvent(input: { id: string; provider: string; eventId: string; orderId: string; payloadHash: string }): Promise<{ applied: boolean }>;
   getCreditPackages(): Promise<Array<{ id: string; name: string; credits: number; priceFen: number }>>;
+  updateUser(input: { userId: string; email: string; displayName: string; passwordHash: string; emailVerifiedAt: string | null }): Promise<StoreUser>;
+  saveMeasurement(input: { id: string; userId: string; kind: string; title: string; summary: string; input: unknown; result: unknown }): Promise<void>;
+  listMeasurements(userId: string): Promise<MeasurementHistoryRow[]>;
 }
 
 type D1DatabaseLike = {
@@ -345,6 +358,25 @@ export class D1Store implements AppStore {
     }
     return CREDIT_PACKAGES.map((item) => ({ id: item.id, name: item.name, credits: item.credits, priceFen: item.priceFen }));
   }
+
+  async updateUser(input: { userId: string; email: string; displayName: string; passwordHash: string; emailVerifiedAt: string | null }) {
+    await this.db.prepare("UPDATE users SET email = ?, display_name = ?, password_hash = ?, email_verified_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .bind(input.email, input.displayName, input.passwordHash, input.emailVerifiedAt, input.userId).run();
+    const user = await this.getUserById(input.userId);
+    if (!user) throw new StoreError("USER_NOT_FOUND", "账号不存在");
+    return user;
+  }
+
+  async saveMeasurement(input: { id: string; userId: string; kind: string; title: string; summary: string; input: unknown; result: unknown }) {
+    await this.db.prepare("INSERT INTO measurement_history (id, user_id, kind, title, summary, input_json, result_json) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .bind(input.id, input.userId, input.kind, input.title, input.summary, JSON.stringify(input.input), JSON.stringify(input.result)).run();
+  }
+
+  async listMeasurements(userId: string) {
+    const rows = await this.db.prepare("SELECT id, kind, title, summary, input_json, result_json, created_at FROM measurement_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 100")
+      .bind(userId).all<any>();
+    return rows.results.map((row) => ({ id: row.id, kind: row.kind, title: row.title, summary: row.summary, input: JSON.parse(row.input_json), result: JSON.parse(row.result_json), createdAt: row.created_at }));
+  }
 }
 
 type MemorySession = { tokenHash: string; userId: string; expiresAt: string };
@@ -363,6 +395,7 @@ export class MemoryStore implements AppStore {
   private paymentEvents = new Map<string, { applied: boolean }>();
   private emailVerifications = new Map<string, EmailVerificationRow>();
   private registrationEvents: MemoryRegistrationEvent[] = [];
+  private measurements: Array<MeasurementHistoryRow & { userId: string }> = [];
 
   private key(userId: string, idempotencyKey: string) {
     return `${userId}:${idempotencyKey}`;
@@ -528,6 +561,23 @@ export class MemoryStore implements AppStore {
 
   async getCreditPackages() {
     return CREDIT_PACKAGES.map((item) => ({ id: item.id, name: item.name, credits: item.credits, priceFen: item.priceFen }));
+  }
+
+  async updateUser(input: { userId: string; email: string; displayName: string; passwordHash: string; emailVerifiedAt: string | null }) {
+    const user = this.users.get(input.userId);
+    if (!user) throw new StoreError("USER_NOT_FOUND", "账号不存在");
+    this.usersByEmail.delete(user.email.toLowerCase());
+    Object.assign(user, { email: input.email, displayName: input.displayName, passwordHash: input.passwordHash, emailVerifiedAt: input.emailVerifiedAt });
+    this.usersByEmail.set(user.email.toLowerCase(), user);
+    return user;
+  }
+
+  async saveMeasurement(input: { id: string; userId: string; kind: string; title: string; summary: string; input: unknown; result: unknown }) {
+    this.measurements.push({ ...input, createdAt: new Date().toISOString() });
+  }
+
+  async listMeasurements(userId: string) {
+    return this.measurements.filter((item) => item.userId === userId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 100);
   }
 }
 

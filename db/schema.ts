@@ -183,3 +183,14 @@ export const analysisJobs = sqliteTable("analysis_jobs", {
   refunded: integer("refunded", { mode: "boolean" }).notNull().default(false),
   ...timestamps,
 });
+
+export const measurementHistory = sqliteTable("measurement_history", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  kind: text("kind").notNull(),
+  title: text("title").notNull(),
+  summary: text("summary").notNull().default(""),
+  inputJson: text("input_json").notNull(),
+  resultJson: text("result_json").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [index("idx_measurement_history_user_created").on(table.userId, table.createdAt)]);
