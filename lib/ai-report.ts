@@ -49,7 +49,7 @@ export class AiReportError extends Error {
   }
 }
 
-const PROMPT_VERSION = "deep-report-2026-08-11-v9";
+const PROMPT_VERSION = "deep-report-2026-08-18-v10";
 const REQUIRED_CHAPTERS: Record<ReportKind, string[]> = {
   bazi: ["overview", "career_wealth", "relationships", "health", "children", "family", "timing"],
   ziwei: ["overview", "career_wealth", "relationships", "health", "children", "family", "timing"],
@@ -65,6 +65,12 @@ function hasBannedCertainty(text: string) {
     const prefix = text.slice(Math.max(0, index - 16), index);
     if (!NEGATED_CERTAINTY.test(prefix)) return true;
   }
+  return false;
+}
+
+function isTimingEvidenceId(kind: ReportKind, id: string) {
+  if (kind === "bazi") return /^B(?:05|07)\d$/.test(id);
+  if (kind === "ziwei") return id === "Z004" || id === "Z005" || /^Z03\d$/.test(id);
   return false;
 }
 
@@ -507,13 +513,12 @@ function validateReport(report: GeneratedReport, catalog: EvidenceItem[], kind: 
   ];
   const unknown = [...new Set(references.filter((id) => !validIds.has(id)))];
   if (unknown.length) errors.push(`存在无效证据编号：${unknown.join("、")}`);
-  const isTimingEvidence = (id: string) => kind === "bazi" ? /^B(?:05|07)\d$/.test(id) : kind === "ziwei" ? id === "Z004" || id === "Z005" || /^Z03\d$/.test(id) : false;
   if (kind !== "compatibility" && !requiredChapters.includes("timing")) {
     const baseReferences = [
       ...report.coreConclusions.flatMap((item) => item.evidenceRefs),
       ...report.chapters.flatMap((chapter) => chapter.evidenceRefs),
     ];
-    if (baseReferences.some(isTimingEvidence)) errors.push("基础报告引用了应由流年专题解锁的运限证据");
+    if (baseReferences.some((id) => isTimingEvidenceId(kind, id))) errors.push("基础报告引用了应由流年专题解锁的运限证据");
   }
   for (const id of requiredChapters) if (!report.chapters.some((chapter) => chapter.id === id)) errors.push(`缺少章节：${id}`);
   report.chapters.forEach((chapter) => {
@@ -950,8 +955,10 @@ async function generateReportFromCatalog(args: {
   catalog: EvidenceItem[];
   chapterIds: string[];
 }): Promise<AiDeepReport> {
+  const allowTimingEvidence = args.kind === "compatibility" || args.chapterIds.includes("timing");
   const catalog = args.catalog
     .filter((item) => item && typeof item.id === "string" && typeof item.text === "string")
+    .filter((item) => allowTimingEvidence || !isTimingEvidenceId(args.kind, item.id))
     .slice(0, 120)
     .map((item) => ({ id: item.id.slice(0, 12), text: item.text.slice(0, 800) }));
   const question = args.question?.trim() || `请围绕${args.topics.join("、") || "命盘总览"}进行完整分析。`;
