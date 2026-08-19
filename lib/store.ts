@@ -84,6 +84,8 @@ export interface AppStore {
     idempotencyKey: string;
   }): Promise<OrderRow>;
   getOrderById(id: string): Promise<OrderRow | null>;
+  listOrdersByStatus(status: string): Promise<OrderRow[]>;
+  markOrderAwaitingConfirmation(orderId: string): Promise<OrderRow>;
   markOrderPaid(orderId: string, providerTradeNo: string, paidAt: string): Promise<OrderRow>;
   recordPaymentEvent(input: { id: string; provider: string; eventId: string; orderId: string; payloadHash: string }): Promise<{ applied: boolean }>;
   getCreditPackages(): Promise<Array<{ id: string; name: string; credits: number; priceFen: number }>>;
@@ -331,10 +333,28 @@ export class D1Store implements AppStore {
     return this.mapOrder(row);
   }
 
+  async listOrdersByStatus(status: string) {
+    const rows = await this.db
+      .prepare("SELECT * FROM orders WHERE status = ? ORDER BY created_at DESC LIMIT 200")
+      .bind(status)
+      .all<any>();
+    return rows.results.map((row) => this.mapOrder(row)).filter((order): order is OrderRow => Boolean(order));
+  }
+
   async markOrderPaid(orderId: string, providerTradeNo: string, paidAt: string) {
     await this.db
-      .prepare("UPDATE orders SET status = 'paid', provider_trade_no = ?, paid_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'")
+      .prepare("UPDATE orders SET status = 'paid', provider_trade_no = ?, paid_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status != 'paid'")
       .bind(providerTradeNo, paidAt, orderId)
+      .run();
+    const order = await this.getOrderById(orderId);
+    if (!order) throw new StoreError("ORDER_NOT_FOUND", "订单不存在");
+    return order;
+  }
+
+  async markOrderAwaitingConfirmation(orderId: string) {
+    await this.db
+      .prepare("UPDATE orders SET status = 'awaiting_confirmation', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'")
+      .bind(orderId)
       .run();
     const order = await this.getOrderById(orderId);
     if (!order) throw new StoreError("ORDER_NOT_FOUND", "订单不存在");
@@ -541,6 +561,13 @@ export class MemoryStore implements AppStore {
     return this.orders.get(id) ?? null;
   }
 
+  async listOrdersByStatus(status: string) {
+    return [...this.orders.values()]
+      .filter((order) => order.status === status)
+      .sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""))
+      .slice(0, 200);
+  }
+
   async markOrderPaid(orderId: string, providerTradeNo: string, paidAt: string) {
     const order = this.orders.get(orderId);
     if (!order) throw new StoreError("ORDER_NOT_FOUND", "订单不存在");
@@ -549,6 +576,13 @@ export class MemoryStore implements AppStore {
       order.providerTradeNo = providerTradeNo;
       order.paidAt = paidAt;
     }
+    return order;
+  }
+
+  async markOrderAwaitingConfirmation(orderId: string) {
+    const order = this.orders.get(orderId);
+    if (!order) throw new StoreError("ORDER_NOT_FOUND", "订单不存在");
+    if (order.status === "pending") order.status = "awaiting_confirmation";
     return order;
   }
 

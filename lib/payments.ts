@@ -9,13 +9,13 @@ export type PaymentResult = {
 };
 
 export type PaymentSession = {
-  mode: "sandbox" | "wechat" | "alipay";
+  mode: "sandbox" | "wechat" | "alipay" | "manual";
   payUrl?: string;
   qrCodeDataUrl?: string;
 };
 
 export function getPaymentProvider() {
-  return (process.env.PAYMENT_PROVIDER || "sandbox") as "sandbox" | "wechat" | "alipay";
+  return (process.env.PAYMENT_PROVIDER || "sandbox") as "sandbox" | "wechat" | "alipay" | "manual";
 }
 
 export async function createPaymentOrder(user: StoreUser, packageId: string, idempotencyKey: string, store?: AppStore): Promise<PaymentResult> {
@@ -44,6 +44,13 @@ async function createProviderSession(order: OrderRow): Promise<PaymentSession> {
   }
   if (order.provider === "wechat") return createWechatNativeOrder(order);
   if (order.provider === "alipay") return createAlipayPagePay(order);
+  if (order.provider === "manual") {
+    return {
+      mode: "manual",
+      qrCodeDataUrl: process.env.MANUAL_PAY_QR_DATA_URL?.trim() || "",
+      payUrl: process.env.MANUAL_PAY_QR_IMAGE?.trim() || "/manual-pay-qr.png",
+    };
+  }
   throw new PaymentError("PAYMENT_PROVIDER_INVALID", "不支持的支付方式", 501);
 }
 
@@ -95,7 +102,7 @@ export async function queryAndSettlePendingOrder(
   store: AppStore,
   order: OrderRow,
 ): Promise<{ order: OrderRow; balanceAfter: number } | null> {
-  if (order.status === "paid" || order.provider === "sandbox") return null;
+  if (order.status === "paid" || order.provider === "sandbox" || order.provider === "manual") return null;
   const query = order.provider === "wechat"
     ? await queryWechatOrder(order.id)
     : order.provider === "alipay"

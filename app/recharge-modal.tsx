@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { CREDIT_PACKAGES } from "../lib/domain";
 
 type PaymentInfo = {
-  mode: "sandbox" | "wechat" | "alipay";
+  mode: "sandbox" | "wechat" | "alipay" | "manual";
   payUrl?: string;
   qrCodeDataUrl?: string;
 };
@@ -21,15 +21,16 @@ const PROVIDER_LABELS: Record<string, string> = {
   sandbox: "沙箱模拟",
   wechat: "微信支付",
   alipay: "支付宝",
+  manual: "微信人工充值",
 };
 
 export function RechargeModal() {
   const [open, setOpen] = useState(false);
-  const [phase, setPhase] = useState<"choose" | "paying" | "done">("choose");
+  const [phase, setPhase] = useState<"choose" | "paying" | "submitted" | "done">("choose");
   const [order, setOrder] = useState<OrderState | null>(null);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
-  const [serverProvider, setServerProvider] = useState<"sandbox" | "wechat" | "alipay">("sandbox");
+  const [serverProvider, setServerProvider] = useState<"sandbox" | "wechat" | "alipay" | "manual">("sandbox");
   const [idempotencyKey] = useState(() => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random()}`));
 
   useEffect(() => {
@@ -43,7 +44,7 @@ export function RechargeModal() {
     fetch("/api/health")
       .then((response) => response.json())
       .then((data) => {
-        if (data?.payments === "wechat" || data?.payments === "alipay") setServerProvider(data.payments);
+        if (["wechat", "alipay", "manual"].includes(data?.payments)) setServerProvider(data.payments);
       })
       .catch(() => {
         // 健康检查失败不影响充值入口
@@ -51,9 +52,9 @@ export function RechargeModal() {
     return () => window.removeEventListener("guanchen:open-recharge", openModal);
   }, []);
 
-  // 真实支付渠道：下单后轮询订单状态，支付平台回调或服务端查询到账后自动完成。
+  // 真实/人工支付渠道：下单后轮询订单状态，到账后自动完成。
   useEffect(() => {
-    if (!open || phase !== "paying" || !order || order.provider === "sandbox") return;
+    if (!open || !["paying", "submitted"].includes(phase) || !order || order.provider === "sandbox") return;
     const timer = window.setInterval(() => {
       void (async () => {
         try {
@@ -131,6 +132,26 @@ export function RechargeModal() {
     window.open(order.payment.payUrl, "_blank", "noopener");
   }
 
+  async function markManualPaid() {
+    if (!order) return;
+    setLoading(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/payments/manual/notify-paid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.orderId }),
+      });
+      const data = await response.json() as { status?: string; message?: string };
+      if (!response.ok || data.status !== "success") throw new Error(data.message || "提交失败，请稍后重试");
+      setPhase("submitted");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "提交失败，请稍后重试");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function backToChoose() {
     setPhase("choose");
     setOrder(null);
@@ -139,6 +160,7 @@ export function RechargeModal() {
 
   const paymentMode = order?.payment.mode || serverProvider;
   const providerLabel = PROVIDER_LABELS[paymentMode] || "在线支付";
+  const manualQrImage = order?.payment.qrCodeDataUrl || order?.payment.payUrl;
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="积分充值">
@@ -148,9 +170,9 @@ export function RechargeModal() {
           <>
             <p className="eyebrow">积分充值</p>
             <h2>选择积分包</h2>
-            {serverProvider === "sandbox"
-              ? <p>当前为测试期沙箱支付，不会产生真实付款。正式支付将在商户资质开通后启用。</p>
-              : <p>支付成功后积分将自动到账，可直接用于解锁完整报告。</p>}
+            {serverProvider === "sandbox" && <p>当前为测试期沙箱支付，不会产生真实付款。正式支付将在商户资质开通后启用。</p>}
+            {serverProvider === "manual" && <p>当前为人工充值模式：请使用微信扫描收款码付款，付款后点击“我已支付”，管理员确认到账后积分自动到账。</p>}
+            {(serverProvider === "wechat" || serverProvider === "alipay") && <p>支付成功后积分将自动到账，可直接用于解锁完整报告。</p>}
             {CREDIT_PACKAGES.map((pack) => (
               <button className="modal-package" key={pack.id} disabled={loading} onClick={() => void createOrder(pack.id)}>
                 <span><b>{pack.credits} 积分</b><small>约 {pack.name}</small></span>
@@ -167,6 +189,7 @@ export function RechargeModal() {
             <div className="payment-order">
               <span><small>积分包</small><b>{order.credits} 积分</b></span>
               <span><small>应付金额</small><b>¥{(order.amountFen / 100).toFixed(2)}</b></span>
+              <span><small>订单号</small><b>{order.orderId}</b></span>
               <span><small>支付方式</small><b>{providerLabel}</b></span>
             </div>
             {order.payment.mode === "sandbox" && (
@@ -190,9 +213,32 @@ export function RechargeModal() {
                 <p>点击后将在新窗口打开支付宝完成支付，到账后本窗口会自动更新。</p>
               </div>
             )}
-            {(order.payment.mode === "wechat" || order.payment.mode === "alipay") && (
+            {order.payment.mode === "manual" && (
+              <div className="payment-qr">
+                {manualQrImage
+                  ? <img src={manualQrImage} alt="微信收款码" width={320} height={320} />
+                  : <p className="form-notice">收款码暂未配置，请联系管理员。</p>}
+                <p>
+                  请使用微信扫描收款码，付款金额 <b>¥{(order.amountFen / 100).toFixed(2)}</b>；
+                  付款时可在备注填写订单号后 6 位 <b>{order.orderId.slice(-6).toUpperCase()}</b>，方便核对。
+                </p>
+                <button className="primary-btn payment-confirm" disabled={loading} onClick={() => void markManualPaid()}>
+                  {loading ? "正在提交…" : "我已支付，等待确认"}
+                </button>
+                <p className="form-notice">提交后由管理员核对微信到账，确认后积分自动到账，请留意本窗口更新。</p>
+              </div>
+            )}
+            {phase === "paying" && (order.payment.mode === "wechat" || order.payment.mode === "alipay") && (
               <button className="text-btn payment-cancel" onClick={backToChoose}>稍后支付，返回重选</button>
             )}
+            {notice && <p className="form-notice">{notice}</p>}
+          </>
+        )}
+        {phase === "submitted" && order && (
+          <>
+            <p className="eyebrow">已提交确认</p>
+            <h2>等待管理员确认到账</h2>
+            <p>订单号：{order.orderId}。管理员核对微信到账后，{order.credits} 积分会自动写入账户，本页面会自动刷新。</p>
             {notice && <p className="form-notice">{notice}</p>}
           </>
         )}

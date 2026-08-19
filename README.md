@@ -95,6 +95,28 @@ https://guanchen.site/api/payments/webhook/alipay
 - 订单、支付事件与积分流水均以数据库唯一约束保证幂等，重复回调不会重复加积分。
 - 前端轮询订单状态时，服务端会向支付平台查询真实交易状态，回调丢失也能自动补记。
 - 商户私钥、APIv3 密钥等只能放在服务端环境变量中，不得写入源码或客户端包。
+
+## 人工充值（临时方案，无需商户号）
+
+在商户资质开通前，可先用 `PAYMENT_PROVIDER=manual` 走“微信收款商业版 + 人工确认”流程：
+
+- 用户选择积分包后看到管理员配置的微信收款码、应付金额与订单号；
+- 用户用微信付款后点击“我已支付”，订单进入 `awaiting_confirmation`；
+- 管理员访问 `/admin/recharge`，输入密码后核对微信到账，点击“确认到账”，积分自动入账；
+- 该流程为临时方案，每笔订单仍需人工核对，只适合小额、低频场景；正式收款请切换为微信/支付宝商户支付。
+
+人工充值环境变量：
+
+- `PAYMENT_PROVIDER=manual`
+- `MANUAL_PAY_QR_IMAGE`：收款码图片地址，可放一张截图到 `public/manual-pay-qr.png`（默认即此路径），也可填任意图片 URL
+- `MANUAL_PAY_QR_DATA_URL`：可选，收款码的 data URL，优先于 `MANUAL_PAY_QR_IMAGE`
+- `ADMIN_RECHARGE_PASSWORD`：后台确认到账所需的管理员密码（务必设置为强密码并只放在服务端环境变量中）
+
+管理后台：
+
+```text
+https://guanchen.site/admin/recharge
+```
 - 测试积分：登录后调用 `POST /api/sandbox/tester-credits`，`code` 见该路由常量。
 
 ## 计算边界

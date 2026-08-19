@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
-import test, { before, after } from "node:test";
-import http from "node:http";
-import { once } from "node:events";
+import test from "node:test";
 import {
   createCipheriv,
   createPrivateKey,
@@ -44,62 +42,40 @@ function wechatResource(plaintext) {
   };
 }
 
-function createMockPaymentServer() {
-  return http.createServer((req, res) => {
-    const url = new URL(req.url, "http://localhost");
-    if (req.method === "POST" && url.pathname === "/v3/pay/transactions/native") {
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ code_url: "weixin://wxpay/bizpayurl?pr=GC-TEST" }));
-      return;
+// 拦截 Worker 对微信/支付宝的真实网络调用，改为本地固定响应，避免测试依赖外部网络。
+globalThis.fetch = async (input, init) => {
+  const url = String(input);
+  const method = init?.method || "GET";
+  if (url.includes("api.mch.weixin.qq.com")) {
+    if (method === "POST" && url.includes("/v3/pay/transactions/native")) {
+      return Response.json({ code_url: "weixin://wxpay/bizpayurl?pr=GC-TEST" });
     }
-    if (req.method === "GET" && url.pathname.startsWith("/v3/pay/transactions/out-trade-no/")) {
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({
+    if (url.includes("/v3/pay/transactions/out-trade-no/")) {
+      const outTradeNo = decodeURIComponent(url.split("/v3/pay/transactions/out-trade-no/")[1].split("?")[0]);
+      return Response.json({
         trade_state: "SUCCESS",
-        transaction_id: `WX-TX-${url.pathname.split("/").pop()}`,
+        transaction_id: `WX-TX-${outTradeNo}`,
         amount: { total: 3900, currency: "CNY" },
-      }));
-      return;
+      });
     }
-    if (url.pathname.endsWith("/gateway.do")) {
-      const method = url.searchParams.get("method");
-      if (method === "alipay.trade.query") {
-        res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({
-          alipay_trade_query_response: {
-            code: "10000",
-            msg: "Success",
-            trade_status: "TRADE_SUCCESS",
-            trade_no: "ALI-TX-1",
-            total_amount: "39.00",
-          },
-        }));
-        return;
-      }
-    }
-    res.writeHead(404, { "content-type": "application/json" });
-    res.end(JSON.stringify({ message: "not found" }));
-  });
-}
+  }
+  if (url.includes("openapi.alipay.com") && url.includes("alipay.trade.query")) {
+    return Response.json({
+      alipay_trade_query_response: {
+        code: "10000",
+        msg: "Success",
+        trade_status: "TRADE_SUCCESS",
+        trade_no: "ALI-TX-1",
+        total_amount: "39.00",
+      },
+    });
+  }
+  throw new Error(`Unexpected provider call in test: ${url}`);
+};
 
-let worker;
-let server;
-
-before(async () => {
-  server = createMockPaymentServer();
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const { port } = server.address();
-  process.env.WECHAT_API_BASE = `http://127.0.0.1:${port}`;
-  process.env.ALIPAY_GATEWAY = `http://127.0.0.1:${port}/gateway.do`;
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("payments", `${process.pid}-${Date.now()}-${Math.random()}`);
-  worker = (await import(workerUrl.href)).default;
-});
-
-after(() => {
-  server?.close();
-});
+const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+workerUrl.searchParams.set("payments", `${process.pid}-${Date.now()}-${Math.random()}`);
+const worker = (await import(workerUrl.href)).default;
 
 async function request(path, options = {}, cookie) {
   const headers = { "content-type": "application/json", ...(options.headers || {}), ...(cookie ? { cookie } : {}) };
