@@ -958,23 +958,25 @@ async function generateReportFromCatalog(args: {
   const allowTimingEvidence = args.kind === "compatibility" || args.chapterIds.includes("timing");
   const catalog = args.catalog
     .filter((item) => item && typeof item.id === "string" && typeof item.text === "string")
-    .filter((item) => allowTimingEvidence || !isTimingEvidenceId(args.kind, item.id))
     .slice(0, 120)
     .map((item) => ({ id: item.id.slice(0, 12), text: item.text.slice(0, 800) }));
+  // 基础报告只把原局证据交给 AI，避免误引运限证据；
+  // 但完整证据目录仍随报告保存，供后续流年专题重建时间线。
+  const promptCatalog = allowTimingEvidence ? catalog : catalog.filter((item) => !isTimingEvidenceId(args.kind, item.id));
   const question = args.question?.trim() || `请围绕${args.topics.join("、") || "命盘总览"}进行完整分析。`;
-  let result = await requestStructuredReport({ kind: args.kind, question, topics: args.topics, catalog, chapterIds: args.chapterIds });
-  normalizeGeneratedReport(result.parsed, catalog, args.kind);
+  let result = await requestStructuredReport({ kind: args.kind, question, topics: args.topics, catalog: promptCatalog, chapterIds: args.chapterIds });
+  normalizeGeneratedReport(result.parsed, promptCatalog, args.kind);
   result.parsed.chapters = args.chapterIds
     .map((id) => result.parsed.chapters.find((chapter) => chapter.id === id))
     .filter((chapter): chapter is AiReportChapter => Boolean(chapter));
-  let errors = validateReport(result.parsed, catalog, args.kind, args.chapterIds);
+  let errors = validateReport(result.parsed, promptCatalog, args.kind, args.chapterIds);
   if (errors.length) {
-    result = await requestStructuredReport({ kind: args.kind, question, topics: args.topics, catalog, chapterIds: args.chapterIds, correction: `上一版未通过质量检查，请重写并修复：${errors.join("；")}` });
-    normalizeGeneratedReport(result.parsed, catalog, args.kind);
+    result = await requestStructuredReport({ kind: args.kind, question, topics: args.topics, catalog: promptCatalog, chapterIds: args.chapterIds, correction: `上一版未通过质量检查，请重写并修复：${errors.join("；")}` });
+    normalizeGeneratedReport(result.parsed, promptCatalog, args.kind);
     result.parsed.chapters = args.chapterIds
       .map((id) => result.parsed.chapters.find((chapter) => chapter.id === id))
       .filter((chapter): chapter is AiReportChapter => Boolean(chapter));
-    errors = validateReport(result.parsed, catalog, args.kind, args.chapterIds);
+    errors = validateReport(result.parsed, promptCatalog, args.kind, args.chapterIds);
   }
   if (errors.length) throw new AiReportError("REPORT_VALIDATION_FAILED", `报告未通过证据与完整性检查：${errors.join("；")}`);
   return {

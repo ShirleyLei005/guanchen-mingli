@@ -39,8 +39,62 @@ pnpm test
 - 未登录用户积分为 0；新账号在邮箱验证通过后才通过 `signup_gift` 账本条目获得 5 积分，重复验证不会重复发放。
 - 防刷：注册页含隐藏蜜罐字段；同一 IP 24 小时内最多创建 10 个账号；6 位验证码 30 分钟有效，最多尝试 5 次，重发间隔 60 秒。
 - 邮件服务：配置 `RESEND_API_KEY` 与 `EMAIL_FROM` 后自动发送验证码邮件；本地验收可设 `ALLOW_DEBUG_VERIFICATION_CODE=true`，接口会返回 `debugCode` 供测试，生产环境请勿开启。
-- 支付当前为沙箱模式（`PAYMENT_PROVIDER=sandbox`）：`POST /api/payments/orders` 创建订单，`POST /api/payments/sandbox/confirm` 模拟用户确认，`POST /api/payments/webhook/sandbox` 模拟服务商回调。
-- 正式启用微信/支付宝时，设置 `PAYMENT_PROVIDER=wechat|alipay` 并配置对应商户密钥环境变量；回调验签在 `lib/payments.ts` 适配器中扩展，业务逻辑不依赖具体渠道。
+- 支付默认沙箱模式（`PAYMENT_PROVIDER=sandbox`）：`POST /api/payments/orders` 创建订单，`POST /api/payments/sandbox/confirm` 模拟用户确认，`POST /api/payments/webhook/sandbox` 模拟服务商回调。
+- 正式支付支持微信 Native 扫码与支付宝电脑网站支付，服务端验签、幂等入账与订单查询已内置，见下方“支付接入”章节。
+
+## 支付接入（微信 / 支付宝）
+
+设置 `PAYMENT_PROVIDER=wechat|alipay` 并配置对应商户密钥后，充值入口会自动切换为真实收银台；未配置时始终回退到沙箱，不会产生真实交易。
+
+公共环境变量：
+
+- `PAYMENT_PROVIDER`：`sandbox`（默认）/ `wechat` / `alipay`
+- `PAYMENT_NOTIFY_BASE_URL`：站点公网域名，例如 `https://guanchen.site`，用于拼接支付回调地址
+- `PAYMENT_RETURN_BASE_URL`：支付宝支付完成后跳转地址，默认同 `PAYMENT_NOTIFY_BASE_URL`
+
+### 微信支付（Native 扫码）
+
+前置条件：已开通微信支付商户号，并在商户平台开通 Native 支付、完成域名配置。
+
+环境变量：
+
+- `WECHAT_PAY_MCHID`：商户号
+- `WECHAT_PAY_APPID`：公众号/小程序 AppID
+- `WECHAT_PAY_SERIAL_NO`：商户 API 证书序列号
+- `WECHAT_PAY_PRIVATE_KEY`：商户 API 私钥 PEM（PKCS#1 或 PKCS#8 均可）
+- `WECHAT_PAY_API_V3_KEY`：APIv3 密钥（32 位字符串）
+- `WECHAT_PAY_PUBLIC_KEY`：微信支付公钥 PEM（在商户平台下载“微信支付公钥”）
+- `WECHAT_PAY_PUBLIC_KEY_ID`：微信支付公钥 ID（即公钥证书序列号）
+
+回调地址（需在商户平台配置为可用的支付回调域名）：
+
+```text
+https://guanchen.site/api/payments/webhook/wechat
+```
+
+### 支付宝（电脑网站支付）
+
+前置条件：支付宝开放平台已创建应用并签约“电脑网站支付”，完成应用网关与回调域名配置。
+
+环境变量：
+
+- `ALIPAY_APP_ID`：开放平台应用 APPID
+- `ALIPAY_PRIVATE_KEY`：应用私钥 PEM（PKCS#1 或 PKCS#8 均可）
+- `ALIPAY_PUBLIC_KEY`：支付宝公钥 PEM
+- `ALIPAY_GATEWAY`：网关地址，默认 `https://openapi.alipay.com/gateway.do`
+
+回调地址（在支付宝应用后台配置）：
+
+```text
+https://guanchen.site/api/payments/webhook/alipay
+```
+
+### 入账与安全
+
+- 微信回调使用 `WECHATPAY2-SHA256-RSA2048` 验签并解密 AES-256-GCM 资源；支付宝回调使用 RSA2 验签，同时核对 AppID、订单号与金额。
+- 订单、支付事件与积分流水均以数据库唯一约束保证幂等，重复回调不会重复加积分。
+- 前端轮询订单状态时，服务端会向支付平台查询真实交易状态，回调丢失也能自动补记。
+- 商户私钥、APIv3 密钥等只能放在服务端环境变量中，不得写入源码或客户端包。
 - 测试积分：登录后调用 `POST /api/sandbox/tester-credits`，`code` 见该路由常量。
 
 ## 计算边界
