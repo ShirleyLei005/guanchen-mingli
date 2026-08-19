@@ -42,3 +42,4 @@ next-env.d.ts
 /outputs/
 /work/
 /.tools/
+/public/manual-pay-qr.png
