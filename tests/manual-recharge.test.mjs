@@ -8,6 +8,7 @@ process.env.ALLOW_DEBUG_VERIFICATION_CODE = "true";
 process.env.PAYMENT_PROVIDER = "manual";
 process.env.ADMIN_RECHARGE_PASSWORD = "test-admin-secret";
 process.env.MANUAL_PAY_QR_IMAGE = "/manual-pay-qr.png";
+process.env.MANUAL_AUTO_CONFIRM = "false";
 
 const workerUrl = new URL("../dist/server/index.js", import.meta.url);
 workerUrl.searchParams.set("manual-recharge", `${process.pid}-${Date.now()}-${Math.random()}`);
@@ -107,4 +108,67 @@ test("manual recharge rejects marking another user's order as paid", async () =>
     body: JSON.stringify({ orderId: order.orderId }),
   }, intruder.cookie);
   assert.equal(forged.status, 403);
+});
+
+test("manual auto-confirm credits immediately, rejects reused trade numbers, and respects the daily limit", async () => {
+  process.env.MANUAL_AUTO_CONFIRM = "true";
+  process.env.MANUAL_AUTO_CONFIRM_DAILY_LIMIT_FEN = "1000";
+  try {
+    const { cookie } = await registerUser("auto@example.com");
+    const orderResponse = await request("/api/payments/orders", {
+      method: "POST",
+      body: JSON.stringify({ packageId: "light", idempotencyKey: "auto-order-1" }),
+    }, cookie);
+    const order = await orderResponse.json();
+
+    const markPaid = await request("/api/payments/manual/notify-paid", {
+      method: "POST",
+      body: JSON.stringify({ orderId: order.orderId, tradeNo: "WX2026081900001" }),
+    }, cookie);
+    assert.equal(markPaid.status, 200);
+    const paid = await markPaid.json();
+    assert.equal(paid.orderStatus, "paid");
+    assert.equal(paid.creditsAdded, 10);
+    assert.equal(paid.balanceAfter, 15);
+
+    const duplicate = await request("/api/payments/manual/notify-paid", {
+      method: "POST",
+      body: JSON.stringify({ orderId: order.orderId, tradeNo: "WX2026081900001" }),
+    }, cookie);
+    assert.equal(duplicate.status, 200);
+    assert.equal((await duplicate.json()).creditsAdded, 0);
+
+    const secondResponse = await request("/api/payments/orders", {
+      method: "POST",
+      body: JSON.stringify({ packageId: "light", idempotencyKey: "auto-order-2" }),
+    }, cookie);
+    const second = await secondResponse.json();
+    const reused = await request("/api/payments/manual/notify-paid", {
+      method: "POST",
+      body: JSON.stringify({ orderId: second.orderId, tradeNo: "WX2026081900001" }),
+    }, cookie);
+    assert.equal(reused.status, 400);
+    assert.equal((await reused.json()).code, "TRADE_NO_REUSED");
+
+    const overLimit = await request("/api/payments/manual/notify-paid", {
+      method: "POST",
+      body: JSON.stringify({ orderId: second.orderId }),
+    }, cookie);
+    assert.equal(overLimit.status, 200);
+    assert.equal((await overLimit.json()).orderStatus, "awaiting_confirmation");
+
+    const balance = await request("/api/credits", {}, cookie).then((response) => response.json());
+    assert.equal(balance.credits, 15);
+
+    const confirm = await request("/api/admin/recharge/confirm", {
+      method: "POST",
+      headers: { "x-admin-password": "test-admin-secret" },
+      body: JSON.stringify({ orderId: second.orderId }),
+    });
+    assert.equal(confirm.status, 200);
+    assert.equal((await confirm.json()).creditsAdded, 10);
+  } finally {
+    process.env.MANUAL_AUTO_CONFIRM = "false";
+    delete process.env.MANUAL_AUTO_CONFIRM_DAILY_LIMIT_FEN;
+  }
 });

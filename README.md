@@ -39,7 +39,7 @@ pnpm test
 - 未登录用户积分为 0；新账号在邮箱验证通过后才通过 `signup_gift` 账本条目获得 5 积分，重复验证不会重复发放。
 - 防刷：注册页含隐藏蜜罐字段；同一 IP 24 小时内最多创建 10 个账号；6 位验证码 30 分钟有效，最多尝试 5 次，重发间隔 60 秒。
 - 邮件服务：配置 `RESEND_API_KEY` 与 `EMAIL_FROM` 后自动发送验证码邮件；本地验收可设 `ALLOW_DEBUG_VERIFICATION_CODE=true`，接口会返回 `debugCode` 供测试，生产环境请勿开启。
-- 支付默认沙箱模式（`PAYMENT_PROVIDER=sandbox`）：`POST /api/payments/orders` 创建订单，`POST /api/payments/sandbox/confirm` 模拟用户确认，`POST /api/payments/webhook/sandbox` 模拟服务商回调。
+- 支付临时默认人工充值模式（`PAYMENT_PROVIDER=manual`），配合微信经营收款码；正式接入商户号后通过 `PAYMENT_PROVIDER=wechat|alipay|sandbox` 切换。
 - 正式支付支持微信 Native 扫码与支付宝电脑网站支付，服务端验签、幂等入账与订单查询已内置，见下方“支付接入”章节。
 
 ## 支付接入（微信 / 支付宝）
@@ -98,12 +98,12 @@ https://guanchen.site/api/payments/webhook/alipay
 
 ## 人工充值（临时方案，无需商户号）
 
-在商户资质开通前，可先用 `PAYMENT_PROVIDER=manual` 走“微信收款商业版 + 人工确认”流程：
+在商户资质开通前，可先用 `PAYMENT_PROVIDER=manual`（当前为默认）走“微信收款商业版 + 自动/人工确认”流程：
 
 - 用户选择积分包后看到管理员配置的微信收款码、应付金额与订单号；
-- 用户用微信付款后点击“我已支付”，订单进入 `awaiting_confirmation`；
-- 管理员访问 `/admin/recharge`，输入密码后核对微信到账，点击“确认到账”，积分自动入账；
-- 该流程为临时方案，每笔订单仍需人工核对，只适合小额、低频场景；正式收款请切换为微信/支付宝商户支付。
+- 用户用微信付款后点击“我已支付”，默认自动确认到账；每日自动确认额度用完后转人工确认；
+- 管理员也可访问 `/admin/recharge`，输入密码后核对微信到账，点击“确认到账”手动入账；
+- 微信经营收款码没有官方到账通知接口，自动确认属于“信任模式 + 每日限额防刷”，只适合小额、低频或熟人场景；正式收款请切换为微信/支付宝商户支付。
 
 人工充值环境变量：
 
@@ -111,6 +111,8 @@ https://guanchen.site/api/payments/webhook/alipay
 - `MANUAL_PAY_QR_IMAGE`：收款码图片地址，可放一张截图到 `public/manual-pay-qr.png`（默认即此路径），也可填任意图片 URL
 - `MANUAL_PAY_QR_DATA_URL`：可选，收款码的 data URL，优先于 `MANUAL_PAY_QR_IMAGE`
 - `ADMIN_RECHARGE_PASSWORD`：后台确认到账所需的管理员密码（务必设置为强密码并只放在服务端环境变量中）
+- `MANUAL_AUTO_CONFIRM`：默认 `true`；设为 `false` 则关闭自动确认，全部转人工确认
+- `MANUAL_AUTO_CONFIRM_DAILY_LIMIT_FEN`：每用户每日自动确认金额上限，默认 `5000`（即 ¥50，单位为分）
 
 管理后台：
 

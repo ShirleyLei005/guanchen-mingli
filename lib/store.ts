@@ -84,7 +84,9 @@ export interface AppStore {
     idempotencyKey: string;
   }): Promise<OrderRow>;
   getOrderById(id: string): Promise<OrderRow | null>;
+  findOrderByProviderTradeNo(providerTradeNo: string): Promise<OrderRow | null>;
   listOrdersByStatus(status: string): Promise<OrderRow[]>;
+  sumManualPaidAmountSince(userId: string, sinceIso: string): Promise<number>;
   markOrderAwaitingConfirmation(orderId: string): Promise<OrderRow>;
   markOrderPaid(orderId: string, providerTradeNo: string, paidAt: string): Promise<OrderRow>;
   recordPaymentEvent(input: { id: string; provider: string; eventId: string; orderId: string; payloadHash: string }): Promise<{ applied: boolean }>;
@@ -333,12 +335,25 @@ export class D1Store implements AppStore {
     return this.mapOrder(row);
   }
 
+  async findOrderByProviderTradeNo(providerTradeNo: string) {
+    const row = await this.db.prepare("SELECT * FROM orders WHERE provider_trade_no = ?").bind(providerTradeNo).first<any>();
+    return this.mapOrder(row);
+  }
+
   async listOrdersByStatus(status: string) {
     const rows = await this.db
       .prepare("SELECT * FROM orders WHERE status = ? ORDER BY created_at DESC LIMIT 200")
       .bind(status)
       .all<any>();
     return rows.results.map((row) => this.mapOrder(row)).filter((order): order is OrderRow => Boolean(order));
+  }
+
+  async sumManualPaidAmountSince(userId: string, sinceIso: string) {
+    const row = await this.db
+      .prepare("SELECT COALESCE(SUM(amount_fen), 0) AS total FROM orders WHERE user_id = ? AND provider = 'manual' AND status = 'paid' AND paid_at >= ?")
+      .bind(userId, sinceIso)
+      .first<{ total: number }>();
+    return Number(row?.total ?? 0);
   }
 
   async markOrderPaid(orderId: string, providerTradeNo: string, paidAt: string) {
@@ -561,11 +576,21 @@ export class MemoryStore implements AppStore {
     return this.orders.get(id) ?? null;
   }
 
+  async findOrderByProviderTradeNo(providerTradeNo: string) {
+    return [...this.orders.values()].find((order) => order.providerTradeNo === providerTradeNo) ?? null;
+  }
+
   async listOrdersByStatus(status: string) {
     return [...this.orders.values()]
       .filter((order) => order.status === status)
       .sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""))
       .slice(0, 200);
+  }
+
+  async sumManualPaidAmountSince(userId: string, sinceIso: string) {
+    return [...this.orders.values()]
+      .filter((order) => order.userId === userId && order.provider === "manual" && order.status === "paid" && (order.paidAt ?? "") >= sinceIso)
+      .reduce((total, order) => total + order.amountFen, 0);
   }
 
   async markOrderPaid(orderId: string, providerTradeNo: string, paidAt: string) {

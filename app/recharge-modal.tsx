@@ -30,6 +30,7 @@ export function RechargeModal() {
   const [order, setOrder] = useState<OrderState | null>(null);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
+  const [tradeNo, setTradeNo] = useState("");
   const [serverProvider, setServerProvider] = useState<"sandbox" | "wechat" | "alipay" | "manual">("sandbox");
   const [idempotencyKey] = useState(() => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random()}`));
 
@@ -39,6 +40,7 @@ export function RechargeModal() {
       setPhase("choose");
       setOrder(null);
       setNotice("");
+      setTradeNo("");
     }
     window.addEventListener("guanchen:open-recharge", openModal);
     fetch("/api/health")
@@ -140,11 +142,16 @@ export function RechargeModal() {
       const response = await fetch("/api/payments/manual/notify-paid", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: order.orderId }),
+        body: JSON.stringify({ orderId: order.orderId, tradeNo: tradeNo.trim() }),
       });
-      const data = await response.json() as { status?: string; message?: string };
+      const data = await response.json() as { status?: string; orderStatus?: string; balanceAfter?: number; message?: string };
       if (!response.ok || data.status !== "success") throw new Error(data.message || "提交失败，请稍后重试");
-      setPhase("submitted");
+      if (data.orderStatus === "paid") {
+        window.dispatchEvent(new CustomEvent("guanchen:credits", { detail: Number(data.balanceAfter ?? 0) }));
+        setPhase("done");
+      } else {
+        setPhase("submitted");
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "提交失败，请稍后重试");
     } finally {
@@ -171,7 +178,7 @@ export function RechargeModal() {
             <p className="eyebrow">积分充值</p>
             <h2>选择积分包</h2>
             {serverProvider === "sandbox" && <p>当前为测试期沙箱支付，不会产生真实付款。正式支付将在商户资质开通后启用。</p>}
-            {serverProvider === "manual" && <p>当前为人工充值模式：请使用微信扫描收款码付款，付款后点击“我已支付”，管理员确认到账后积分自动到账。</p>}
+            {serverProvider === "manual" && <p>当前为人工充值模式：请使用微信扫描收款码付款，付款后点击“我已支付”，系统确认后积分自动到账。</p>}
             {(serverProvider === "wechat" || serverProvider === "alipay") && <p>支付成功后积分将自动到账，可直接用于解锁完整报告。</p>}
             {CREDIT_PACKAGES.map((pack) => (
               <button className="modal-package" key={pack.id} disabled={loading} onClick={() => void createOrder(pack.id)}>
@@ -223,9 +230,18 @@ export function RechargeModal() {
                   付款时可在备注填写订单号后 6 位 <b>{order.orderId.slice(-6).toUpperCase()}</b>，方便核对。
                 </p>
                 <button className="primary-btn payment-confirm" disabled={loading} onClick={() => void markManualPaid()}>
-                  {loading ? "正在提交…" : "我已支付，等待确认"}
+                  {loading ? "正在确认…" : "我已支付，确认到账"}
                 </button>
-                <p className="form-notice">提交后由管理员核对微信到账，确认后积分自动到账，请留意本窗口更新。</p>
+                <input
+                  className="payment-trade-input"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="微信支付交易单号（选填，填了更安全）"
+                  value={tradeNo}
+                  onChange={(event) => setTradeNo(event.target.value)}
+                  maxLength={40}
+                />
+                <p className="form-notice">提交后系统自动确认到账；每日自动确认额度有限，超出后转人工确认。</p>
               </div>
             )}
             {phase === "paying" && (order.payment.mode === "wechat" || order.payment.mode === "alipay") && (

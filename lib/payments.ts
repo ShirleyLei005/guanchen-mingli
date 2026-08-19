@@ -15,7 +15,18 @@ export type PaymentSession = {
 };
 
 export function getPaymentProvider() {
-  return (process.env.PAYMENT_PROVIDER || "sandbox") as "sandbox" | "wechat" | "alipay" | "manual";
+  // 临时默认人工充值模式（配合微信经营收款码）。取得正式商户号后，
+  // 通过 PAYMENT_PROVIDER 环境变量切换为 wechat / alipay / sandbox。
+  return (process.env.PAYMENT_PROVIDER || "manual") as "sandbox" | "wechat" | "alipay" | "manual";
+}
+
+export function isManualAutoConfirmEnabled() {
+  return (process.env.MANUAL_AUTO_CONFIRM || "true").toLowerCase() !== "false";
+}
+
+export function getManualAutoConfirmDailyLimitFen() {
+  const raw = Number(process.env.MANUAL_AUTO_CONFIRM_DAILY_LIMIT_FEN ?? "5000");
+  return Number.isFinite(raw) && raw > 0 ? raw : 5000;
 }
 
 export async function createPaymentOrder(user: StoreUser, packageId: string, idempotencyKey: string, store?: AppStore): Promise<PaymentResult> {

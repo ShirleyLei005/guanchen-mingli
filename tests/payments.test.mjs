@@ -5,6 +5,7 @@ const ENV = { ASSETS: { fetch: async () => new Response("Not found", { status: 4
 const CTX = { waitUntil() {}, passThroughOnException() {} };
 
 process.env.ALLOW_DEBUG_VERIFICATION_CODE = "true";
+process.env.PAYMENT_PROVIDER = "sandbox";
 
 async function getWorker() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
