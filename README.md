@@ -44,11 +44,11 @@ pnpm test
 
 ## 支付接入（微信 / 支付宝）
 
-设置 `PAYMENT_PROVIDER=wechat|alipay` 并配置对应商户密钥后，充值入口会自动切换为真实收银台；未配置时始终回退到沙箱，不会产生真实交易。
+设置 `PAYMENT_PROVIDER=wechat|alipay` 并配置对应商户密钥后，充值入口会自动切换为真实收银台；未配置时默认使用人工充值（`manual`），不会产生真实商户交易。
 
 公共环境变量：
 
-- `PAYMENT_PROVIDER`：`sandbox`（默认）/ `wechat` / `alipay`
+- `PAYMENT_PROVIDER`：`manual`（默认）/ `wechat` / `alipay` / `sandbox`
 - `PAYMENT_NOTIFY_BASE_URL`：站点公网域名，例如 `https://guanchen.site`，用于拼接支付回调地址
 - `PAYMENT_RETURN_BASE_URL`：支付宝支付完成后跳转地址，默认同 `PAYMENT_NOTIFY_BASE_URL`
 
